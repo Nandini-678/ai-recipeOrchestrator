@@ -25,6 +25,7 @@ RAW_DATA_DIR = DATA_DIR / "raw"
 PROCESSED_DATA_DIR = DATA_DIR / "processed"
 CHROMA_DIR = DATA_DIR / "chroma"
 SQLITE_PATH = DATA_DIR / "memory.sqlite3"
+NUTRITION_CACHE_PATH = PROCESSED_DATA_DIR / "nutrition_cache.json"
 
 
 class ConfigError(RuntimeError):

@@ -147,6 +147,31 @@ something the user already has. The LLM is consulted only when the table has
 nothing, and **its suggestion is re-screened by the same allergen check before
 it is returned** — the advisor is never trusted on safety.
 
+## How nutrition is computed
+
+No model touches a number. Facts come from USDA per 100g, quantities are
+converted to grams, scaled linearly, and summed — all ordinary Python.
+
+Converting to grams is the hard part, and the agent is explicit about which of
+three cases it is in:
+
+| Case | Example | Basis |
+|---|---|---|
+| Mass | `1 lb butter` | exact — a definition, ingredient-independent |
+| Volume | `1 cup honey` | density table; a cup of honey is 336g, a cup of flour 125g |
+| Count | `3 cloves garlic` | typical item weight |
+
+Anything it cannot convert, or that USDA has no match for, lands in
+`report.unestimated` **with a reason** rather than being counted as zero — a
+panel that quietly omits half the recipe is worse than one that says what it
+missed. Rate-limited lookups are reported distinctly from genuine misses, and
+are never written to the cache.
+
+USDA's own search ranking is poor for recipe ingredients (searching *olive oil*
+returns *Oil, corn, peanut, and olive* first), so candidates are re-ranked to
+prefer entries that say little beyond the query and that are raw rather than
+prepared.
+
 ## Setup
 
 Requires Python 3.12.
@@ -186,7 +211,8 @@ tested without network access or API keys.
       recall + deterministic overlap ranking (170 tests)
 - [x] **4. Safety agent** — hard-coded allergen filtering across the big 9,
       table-first substitution with screened LLM fallback (276 tests)
-- [ ] 5. Nutrition agent
+- [x] **5. Nutrition agent** — USDA lookup with re-ranking and caching,
+      gram conversion, exact serving-scale math (355 tests)
 - [ ] 6. Composer agent
 - [ ] 7. Critic agent + full orchestrator
 - [ ] 8. SQLite memory + Streamlit UI
