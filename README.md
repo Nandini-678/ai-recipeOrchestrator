@@ -54,9 +54,14 @@ ingredients (raw text)
 
 The orchestrator runs these in plain sequential Python — no agent framework.
 
+Where an agent is marked *optional* for LLM use, the model is an enhancement
+rather than a dependency: the ingredient agent uses an LLM only to segment
+rambling prose into phrases, and falls back to a rule-based split if the call
+fails. All quantity math and name normalization is deterministic Python.
+
 | Agent | Responsibility | LLM? |
 |---|---|---|
-| Ingredient | Parse raw text into structured ingredients | yes |
+| Ingredient | Parse raw text into structured ingredients | optional |
 | Retrieval | Rank local recipes by ingredient overlap | no |
 | Safety | Allergen filtering + substitution lookup | fallback only |
 | Nutrition | Fetch and scale nutrition facts | no |
@@ -115,6 +120,7 @@ TheMealDB needs no signup.
 
 ```bash
 pytest
+ruff check .
 ```
 
 The offline agents (ingredient parsing, retrieval, safety, nutrition math) are
@@ -123,7 +129,8 @@ tested without network access or API keys.
 ## Build progress
 
 - [x] **1. Repo scaffolding** — structure, venv, requirements, config, README
-- [ ] 2. Ingredient agent
+- [x] **2. Ingredient agent** — quantity/unit/name parsing, typo + slang
+      normalization, optional LLM segmentation (116 tests)
 - [ ] 3. Retrieval agent (RAG)
 - [ ] 4. Safety / substitution agent
 - [ ] 5. Nutrition agent

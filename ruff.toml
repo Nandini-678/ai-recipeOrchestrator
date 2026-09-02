@@ -1,0 +1,25 @@
+# Explicit lint config so local runs and CI agree.
+line-length = 88
+target-version = "py312"
+
+[lint]
+select = [
+    "E",    # pycodestyle
+    "F",    # pyflakes
+    "I",    # import sorting
+    "B",    # bugbear
+    "BLE",  # blind except
+    "UP",   # pyupgrade
+    "D",    # docstrings
+]
+ignore = [
+    "D203",  # incompatible with D211
+    "D213",  # incompatible with D212
+]
+
+[lint.per-file-ignores]
+# Test names and classes document themselves; module docstrings are enough.
+"tests/*" = ["D101", "D102", "D103"]
+
+[lint.pydocstyle]
+convention = "google"
