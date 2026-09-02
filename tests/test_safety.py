@@ -13,6 +13,7 @@ from agents.normalization import canonicalize
 from agents.recipe import Recipe
 from agents.retrieval import RecipeMatch
 from agents.safety import (
+    ALLERGEN_LABELS,
     ALLERGEN_MARKERS,
     ALLERGEN_SAFE,
     KNOWN_ALLERGENS,
@@ -148,6 +149,18 @@ class TestTableIntegrity:
                 finally:
                     safety_module.ALLERGEN_SAFE[allergen] = original
                 assert triggered, f"{name!r} is redundant in ALLERGEN_SAFE"
+
+    def test_every_allergen_has_a_human_label(self):
+        """The internal names are for matching; nobody avoids "wheat"."""
+        assert set(ALLERGEN_LABELS) == set(KNOWN_ALLERGENS)
+
+    def test_labels_are_distinct(self):
+        assert len(set(ALLERGEN_LABELS.values())) == len(ALLERGEN_LABELS)
+
+    def test_every_label_normalizes_back_to_its_category(self):
+        """A label shown in the UI must round-trip through the parser."""
+        for category, label in ALLERGEN_LABELS.items():
+            assert normalize_allergens([label]) == frozenset({category}), label
 
     def test_exception_keys_are_known_allergens(self):
         assert set(ALLERGEN_SAFE) <= KNOWN_ALLERGENS

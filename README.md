@@ -4,7 +4,7 @@ A multi-agent AI assistant that turns *"here's what's in my fridge"* into a
 reliable, grounded recipe — with allergen filtering, real substitutions, and
 nutrition facts computed in code rather than guessed by a language model.
 
-> **Status:** in development. See [Build progress](#build-progress).
+> **Status:** all eight build steps complete. 543 tests, all offline.
 
 ## Why this design
 
@@ -90,8 +90,10 @@ All free tier, no paid services.
 ```
 .
 ├── agents/         # one module per agent, each independently testable
-├── orchestrator/   # sequential pipeline wiring the agents together
-├── ui/             # Streamlit front end
+├── orchestrator/
+│   ├── pipeline.py # sequential pipeline wiring the agents together
+│   └── memory.py   # SQLite preferences, history and saved recipes
+├── ui/app.py       # Streamlit front end
 ├── tests/          # unit tests, one module per agent
 ├── scripts/        # one-off dataset builders
 ├── data/
@@ -241,6 +243,36 @@ Both API keys are free: [Groq](https://console.groq.com/keys) and
 [USDA FoodData Central](https://fdc.nal.usda.gov/api-key-signup.html).
 TheMealDB needs no signup.
 
+## Running the app
+
+```bash
+streamlit run ui/app.py
+```
+
+Preferences, past runs and saved recipes persist to a local SQLite file
+(`data/memory.sqlite3`, or wherever `RECIPE_DB_PATH` points).
+
+The app degrades rather than fails. With no keys at all it still retrieves,
+screens for allergens, composes from the source instructions and validates —
+everything except model-written prose and USDA nutrition. The sidebar says
+which parts are live.
+
+### Deploying
+
+The code is deployment-ready but nothing is deployed. On Streamlit Community
+Cloud or Hugging Face Spaces, point the app at `ui/app.py` and add the keys as
+secrets:
+
+```toml
+GROQ_API_KEY = "..."
+USDA_API_KEY = "..."
+```
+
+`ui/app.py` bridges `st.secrets` into the environment before `config` loads, so
+the same code runs locally from `.env` and hosted from secrets. Set
+`RECIPE_DB_PATH` to a writable volume if you want the store to survive
+restarts.
+
 ## Running the tests
 
 ```bash
@@ -266,7 +298,8 @@ tested without network access or API keys.
       facts, deterministic fallback (408 tests)
 - [x] **7. Critic agent + orchestrator** — mechanical validation, bounded
       retry and candidate fallback, sequential pipeline (471 tests)
-- [ ] 8. SQLite memory + Streamlit UI
+- [x] **8. SQLite memory + Streamlit UI** — preferences, history, saved
+      recipes, and a front end that degrades without keys (543 tests)
 
 ## License
 

@@ -83,6 +83,21 @@ ALLERGEN_MARKERS: dict[str, frozenset[str]] = {
 #: Every allergen this agent can screen for.
 KNOWN_ALLERGENS: frozenset[str] = frozenset(ALLERGEN_MARKERS)
 
+#: How each category is named to a person. The internal names are chosen for
+#: matching ("milk", "wheat"); nobody says "I avoid wheat" when they mean
+#: gluten, so anything user-facing shows these instead.
+ALLERGEN_LABELS: dict[str, str] = {
+    "milk": "Dairy",
+    "egg": "Eggs",
+    "peanut": "Peanuts",
+    "tree nut": "Tree nuts",
+    "soy": "Soy",
+    "wheat": "Gluten",
+    "fish": "Fish",
+    "shellfish": "Shellfish",
+    "sesame": "Sesame",
+}
+
 #: Genuine exceptions to the marker rule: names that carry an allergen's marker
 #: token but are not that allergen, and that the generic-marker rule below
 #: cannot derive. Deliberately short -- every entry here is load-bearing, and a

@@ -57,6 +57,17 @@ def load_settings() -> Settings:
     )
 
 
+def default_db_path() -> Path:
+    """Where the local SQLite store lives.
+
+    Read at call time rather than at import, so ``RECIPE_DB_PATH`` can point a
+    deployment at a writable volume and can point a test at a temporary file
+    without the import order mattering.
+    """
+    override = os.getenv("RECIPE_DB_PATH")
+    return Path(override) if override else SQLITE_PATH
+
+
 def require(value: str | None, name: str) -> str:
     """Return ``value``, or raise :class:`ConfigError` naming the missing key.
 
