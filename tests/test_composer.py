@@ -347,6 +347,26 @@ class TestModelComposition:
         assert "olive oil" in sent
         assert "replaces butter" in sent
 
+    def test_retry_feedback_reaches_the_prompt(self):
+        """A retry must say what was wrong, not just ask again."""
+        client = _FakeGroqClient(GOOD)
+        agent = ComposerAgent(client=client, model="fake")
+        agent.compose(
+            _screened(["rice"]),
+            _report(),
+            feedback=["Step 5 still says 'egg'; it was replaced with 'flaxseed'."],
+        )
+        sent = client.prompts[0]["messages"][1]["content"]
+        assert "Step 5 still says" in sent
+        assert "rejected" in sent.lower()
+
+    def test_no_feedback_means_no_retry_section(self):
+        client = _FakeGroqClient(GOOD)
+        ComposerAgent(client=client, model="fake").compose(
+            _screened(["rice"]), _report()
+        )
+        assert "rejected" not in client.prompts[0]["messages"][1]["content"].lower()
+
     @pytest.mark.parametrize(
         "content",
         ["not json", "{}", '{"title": "X"}', '{"title": "X", "steps": []}',

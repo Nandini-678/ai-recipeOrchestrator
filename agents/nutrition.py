@@ -318,6 +318,71 @@ class NutritionReport:
 
 SEARCH_URL = "https://api.nal.usda.gov/fdc/v1/foods/search"
 
+#: How many candidates to rank. USDA's relevance ordering is weak for generic
+#: food words, so the right entry is often well down the list.
+SEARCH_PAGE_SIZE = 25
+
+#: Precise USDA queries for ingredients whose plain name searches badly.
+#:
+#: This is the fix for a real and severe failure: searching "rice" returns ten
+#: varieties of rice cracker before any grain, "milk" returns milk crackers and
+#: milk chocolate, and "egg" returns egg bagels. No amount of re-ranking helps
+#: when the correct food is not in the results at all.
+#:
+#: Queries rather than FDC ids on purpose -- ids change between USDA data
+#: releases, wording does not, and a query still goes through the same ranking
+#: and validation as any other lookup.
+SEARCH_ALIASES: dict[str, str] = {
+    "egg": "egg, whole, raw, fresh",
+    "egg white": "egg, white, raw, fresh",
+    "egg yolk": "egg, yolk, raw, fresh",
+    "milk": "milk, whole, 3.25% milkfat",
+    "rice": "rice, white, long-grain, regular, raw, unenriched",
+    "beef": "beef, ground, 80% lean meat, raw",
+    "ground beef": "beef, ground, 80% lean meat, raw",
+    "sugar": "sugars, granulated",
+    "brown sugar": "sugars, brown",
+    "powdered sugar": "sugars, powdered",
+    "salmon": "fish, salmon, atlantic, farmed, raw",
+    "potato": "potatoes, flesh and skin, raw",
+    "sweet potato": "sweet potato, raw, unprepared",
+    "tomato": "tomatoes, red, ripe, raw, year round average",
+    "tomato puree": "tomato products, canned, puree",
+    "tomato paste": "tomato products, canned, paste",
+    "chickpea": "chickpeas, mature seeds, raw",
+    "salt": "salt, table, iodized",
+    "water": "water, tap, municipal",
+    "flour": "flour, wheat, all-purpose, enriched, bleached",
+    "vegetable oil": "oil, vegetable, soybean",
+    "oil": "oil, vegetable, soybean",
+    "pepper": "spices, pepper, black",
+    "parsley": "parsley, fresh",
+    "cilantro": "coriander (cilantro) leaves, raw",
+    "mint": "spearmint, fresh",
+    "green onion": "onions, spring or scallions, raw",
+    "red onion": "onions, red, raw",
+    "ginger": "ginger root, raw",
+    "bay leaf": "spices, bay leaf",
+    "baking powder": "leavening agents, baking powder, double-acting",
+    "baking soda": "leavening agents, baking soda",
+    "cinnamon": "spices, cinnamon, ground",
+    "paprika": "spices, paprika",
+    "thyme": "spices, thyme, dried",
+    "heavy cream": "cream, fluid, heavy whipping",
+    "sour cream": "cream, sour, cultured",
+    "chicken stock": "soup, stock, chicken, home-prepared",
+    "broth": "soup, stock, chicken, home-prepared",
+    "lemon juice": "lemon juice, raw",
+    "lime juice": "lime juice, raw",
+    "sesame seed": "seeds, sesame seeds, whole, dried",
+    "red pepper": "peppers, sweet, red, raw",
+    "bell pepper": "peppers, sweet, red, raw",
+    "red chili": "peppers, hot chili, red, raw",
+    "soy sauce": "soy sauce made from soy and wheat (shoyu)",
+    "pasta": "pasta, dry, enriched",
+    "bread": "bread, white, commercially prepared",
+}
+
 
 class NutritionLookupError(RuntimeError):
     """A lookup failed for a transient reason: network, rate limit, or 5xx.
@@ -334,7 +399,14 @@ _PROCESSED_HINTS: frozenset[str] = frozenset({
     "soup", "dehydrated", "infant", "baby", "ring", "roll", "frozen",
     "restaurant", "fast", "sandwich", "pizza", "school", "reduced", "tender",
     "nugget", "patty", "snack", "candy", "dessert", "flavored", "beverage",
+    "cake", "cracker", "bagel", "cooky", "cookie", "bar", "chip", "powder",
+    "supplement", "substitute", "imitation", "bologna", "sausage", "cured",
 })
+
+#: A description whose *first* word answers the query is far more likely to be
+#: the food itself than one that mentions it later: "Onions, raw" versus
+#: "Bologna, beef". This outweighs every other signal.
+_HEAD_MATCH_BONUS = 5.0
 
 _WORD = re.compile(r"[^a-z0-9]+")
 
@@ -391,12 +463,15 @@ def _rank_score(query: str, description: str) -> float:
     score = 0.0
     for token in query_tokens:
         if token in description_tokens:
-            score += 0.1 * description_tokens.index(token)
+            score += 0.5 * description_tokens.index(token)
         else:
             score += 25.0  # a missing query term is close to disqualifying
 
+    if description_tokens and description_tokens[0] in query_tokens:
+        score -= _HEAD_MATCH_BONUS
+
     extra = [t for t in description_tokens if t not in query_tokens]
-    score += len(extra)
+    score += 0.35 * len(extra)
     score += 2.0 * len(set(extra) & _PROCESSED_HINTS)
     if "raw" in description_tokens:
         score -= 1.5
@@ -486,7 +561,7 @@ class FoodDataCentralClient:
 
         # A NutritionLookupError propagates uncached: it means "ask again
         # later", and writing it down would poison the cache permanently.
-        result = self._fetch(key)
+        result = self._fetch(SEARCH_ALIASES.get(key, key))
         self._cache[key] = (
             None
             if result is None
@@ -512,7 +587,7 @@ class FoodDataCentralClient:
                 params={
                     "query": query,
                     "api_key": self._api_key,
-                    "pageSize": 10,
+                    "pageSize": SEARCH_PAGE_SIZE,
                     "dataType": ["Foundation", "SR Legacy"],
                 },
                 timeout=self._timeout,

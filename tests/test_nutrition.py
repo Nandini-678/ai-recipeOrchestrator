@@ -14,6 +14,7 @@ import pytest
 from agents.ingredient import Ingredient, parse_ingredients
 from agents.nutrition import (
     MASS_TO_GRAMS,
+    SEARCH_ALIASES,
     VOLUME_TO_ML,
     FoodDataCentralClient,
     NutritionAgent,
@@ -513,3 +514,83 @@ class TestScaleIngredients:
     def test_factor_must_be_positive(self, factor):
         with pytest.raises(ValueError, match="factor"):
             scale_ingredients([], factor)
+
+
+class TestSearchAliases:
+    """Guards for the lookup failures found by testing against the live API.
+
+    Searching USDA for "rice" returns ten rice crackers before any grain,
+    "milk" returns milk crackers and milk chocolate, and "egg" returns egg
+    bagels. Re-ranking cannot fix a result set that never contained the food,
+    so ambiguous names get a precise query instead.
+    """
+
+    def test_alias_keys_are_canonical(self):
+        """A non-canonical key could never be looked up."""
+        from agents.normalization import canonicalize
+
+        offenders = {k: canonicalize(k) for k in SEARCH_ALIASES if canonicalize(k) != k}
+        assert offenders == {}
+
+    def test_no_alias_is_a_no_op(self):
+        assert all(key != value for key, value in SEARCH_ALIASES.items())
+
+    def test_the_alias_is_what_gets_sent_to_usda(self):
+        session = _FakeSession({"foods": [ONION]})
+        client = FoodDataCentralClient(api_key="k", session=session)
+        client.lookup("egg")
+        assert session.calls[0]["query"] == SEARCH_ALIASES["egg"]
+
+    def test_names_without_an_alias_are_searched_as_is(self):
+        session = _FakeSession({"foods": [ONION]})
+        client = FoodDataCentralClient(api_key="k", session=session)
+        client.lookup("onion")
+        assert session.calls[0]["query"] == "onion"
+
+    def test_the_cache_key_is_the_ingredient_not_the_alias(self):
+        """Two ingredients sharing an alias must not collide in the cache."""
+        session = _FakeSession({"foods": [ONION]})
+        client = FoodDataCentralClient(api_key="k", session=session)
+        client.lookup("egg")
+        client.lookup("egg")
+        assert len(session.calls) == 1
+
+
+class TestRankingAgainstRealDescriptions:
+    """Every pair here is verbatim from a live USDA response.
+
+    The left-hand entry is the food a recipe means; the right-hand one is what
+    the original ranking actually picked, which would have reported egg bagels
+    (278 kcal) as the nutrition for an egg (143 kcal).
+    """
+
+    @pytest.mark.parametrize(
+        ("query", "wanted", "wrong"),
+        [
+            ("egg", "Egg, whole, raw, fresh", "Bagels, egg"),
+            ("egg", "Egg, whole, raw, fresh", "Bread, egg"),
+            ("milk", "Milk, whole, 3.25% milkfat", "Crackers, milk"),
+            ("milk", "Milk, whole, 3.25% milkfat", "Candies, milk chocolate"),
+            ("beef", "Beef, tenderloin steak, raw", "Bologna, beef"),
+            (
+                "rice",
+                "Rice, white, long-grain, regular, raw, unenriched",
+                "Rice crackers",
+            ),
+            ("sugar", "Sugars, granulated", "Cookies, sugar, refrigerated dough"),
+            ("onion", "Onions, raw", "DENNY'S, onion rings"),
+            (
+                "tomato",
+                "Tomatoes, red, ripe, raw, year round average",
+                "Tomato powder",
+            ),
+        ],
+    )
+    def test_the_food_beats_the_product_made_from_it(self, query, wanted, wrong):
+        assert _rank_score(query, wanted) < _rank_score(query, wrong)
+
+    def test_a_description_led_by_the_query_wins(self):
+        """"Onions, raw" answers "onion"; "Bologna, beef" does not answer "beef"."""
+        assert _rank_score("beef", "Beef, ground, raw") < _rank_score(
+            "beef", "Bologna, beef"
+        )
