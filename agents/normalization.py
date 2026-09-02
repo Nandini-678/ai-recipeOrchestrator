@@ -108,6 +108,7 @@ PREP_MODIFIERS: frozenset[str] = frozenset({
     "raw", "cooked", "boneless", "skinless", "finely", "roughly", "thinly",
     "optional", "packed", "softened", "melted", "beaten", "washed", "rinsed",
     "trimmed", "stemmed", "seeded", "pitted", "torn", "cut", "leftover",
+    "broken", "crumbled", "shelled", "drained", "undrained",
     "into", "cube", "chunk", "strip", "wedge", "batons", "baton", "approx",
     "thick", "thin", "long", "square", "round", "whole", "slice", "sliver",
     # "salt to taste" is a quantity hedge, not part of the ingredient's name
@@ -190,6 +191,10 @@ _NUMERIC_TOKEN = re.compile(r"^[\d.,/\-\u00bc-\u00be\u2150-\u215e]+$")
 #: "juice of 2 lemons" -> "lemon juice"; same for zest, rind, and peel.
 _EXTRACT_OF = re.compile(r"^(juice|zest|rind|peel)\s+of\s+(.+)$")
 
+#: "butter or margarine" names one ingredient two ways. Keeping both makes it
+#: a name that matches neither, so the first alternative wins.
+_ALTERNATIVE = re.compile(r"\s+or\s+.*$")
+
 
 def strip_accents(text: str) -> str:
     """Fold accented characters to ASCII so "jalapeño" matches "jalapeno"."""
@@ -251,7 +256,7 @@ def normalize_name(raw: str) -> str:
     # ("cubes", "strips") only become matchable after singularization.
     words = [w for w in words if w not in PREP_MODIFIERS]
 
-    name = " ".join(words).strip()
+    name = _ALTERNATIVE.sub("", " ".join(words)).strip()
     if not name:
         return ""
 

@@ -126,8 +126,8 @@ class TestRoundTrip:
         save_recipes(sample_recipes, path)
         assert load_recipes(path) == sample_recipes
 
-    def test_load_points_at_the_fetch_script_when_missing(self, tmp_path):
-        with pytest.raises(FileNotFoundError, match="scripts.fetch_recipes"):
+    def test_load_points_at_the_build_script_when_missing(self, tmp_path):
+        with pytest.raises(FileNotFoundError, match="scripts.build_corpus"):
             load_recipes(tmp_path / "absent.json")
 
     def test_saved_file_is_valid_readable_json(self, tmp_path, sample_recipes):

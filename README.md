@@ -95,7 +95,7 @@ All free tier, no paid services.
 │   └── memory.py   # SQLite preferences, history and saved recipes
 ├── ui/app.py       # Streamlit front end
 ├── tests/          # unit tests, one module per agent
-├── scripts/        # one-off dataset builders
+├── scripts/        # dataset fetchers and the corpus merger
 ├── data/
 │   ├── raw/        # cached API responses (gitignored)
 │   └── processed/  # normalized corpus, committed so the repo runs offline
@@ -105,18 +105,33 @@ All free tier, no paid services.
 
 ## The recipe corpus
 
-790 recipes from TheMealDB ship with the repo at
-`data/processed/recipes.json`, so nothing needs fetching to run the tests or
-the app. To rebuild it:
+**12,790 recipes** ship with the repo at `data/processed/recipes.json`, so
+nothing needs fetching to run the tests or the app. They come from two sources,
+and each recipe records which:
+
+| Source | Recipes | Why it is here |
+|---|---|---|
+| [TheMealDB](https://www.themealdb.com/api.php) | 790 | Curated dishes with images, cuisines and categories |
+| [RecipeNLG](https://recipenlg.cs.put.poznan.pl/) | 12,000 | Simple home cooking — median 7 ingredients — which is what makes *cook with what you have* work |
+
+Licences differ between them and neither is MIT. See
+[DATA_LICENSES.md](DATA_LICENSES.md) — the short version is that RecipeNLG is
+CC BY-NC-SA 4.0, so this project is fine to fork and learn from but not to run
+commercially without dropping that half.
+
+To rebuild:
 
 ```bash
-python -m scripts.fetch_recipes            # fetch, cache, normalize
-python -m scripts.fetch_recipes --offline  # re-normalize from the cache
+python -m scripts.fetch_recipes      # TheMealDB (26 API calls)
+python -m scripts.fetch_recipenlg    # RecipeNLG (one 120MB parquet shard)
+python -m scripts.build_corpus       # merge into data/processed/recipes.json
 ```
 
-Corpus ingredients are parsed by the *same* pipeline as user input, which is
-what makes overlap matching work: "Plain Flour" in a recipe and "maida" in your
-pantry both canonicalize to `all-purpose flour` before they are ever compared.
+Both fetchers take `--offline` to re-normalize from their cache without
+network access. Corpus ingredients are parsed by the *same* pipeline as user
+input, which is what makes overlap matching work: "Plain Flour" in a recipe and
+"maida" in your pantry both canonicalize to `all-purpose flour` before they are
+ever compared.
 
 ## How retrieval ranks
 
@@ -143,20 +158,27 @@ already have it. Being told to buy flaxseed instead of an egg is not help.
 Common staples (salt, water, oil — salt alone is in 298 of the 790 recipes) are
 assumed present and excluded, but still reported so the composer can list them.
 
-### A note on the dataset
+### Why two sources
 
-TheMealDB is a corpus of composed restaurant dishes, median 10 ingredients.
-That makes it a poor fit for strict *cook-with-what-you-have*: for a six-item
-pantry only one recipe needs nothing extra and twelve need two. The ranking
-above extracts the best available answer, and the "willing to buy" control
-makes the trade-off explicit rather than hiding it. A corpus of simple
-everyday recipes would suit the product better.
+TheMealDB alone is a corpus of composed restaurant dishes, median 10
+ingredients, and it made strict *cook-with-what-you-have* nearly impossible:
 
-About 39% of TheMealDB recipes name an ingredient in their steps that their own
-list omits. Those are recorded per recipe in `unlisted_in_steps` and ranked
-down. They are deliberately *not* auto-added to the ingredient list: sampling
-showed roughly half are alternatives ("pork or chicken") or optional garnishes,
-so adding them would make the shopping list wrong rather than right.
+| | TheMealDB alone | With RecipeNLG |
+|---|---|---|
+| Median ingredients | 10 | **7** |
+| Recipes with ≤6 ingredients | 16% | **45%** |
+| Self-consistent ingredient lists | 61% | **85%** |
+| Options at "buy ≤1" for a 6-item pantry | 4 | **~30** |
+
+RecipeNLG is curated on the way in — 3–9 ingredients, 2–12 steps, a readable
+title, and at most one ingredient its steps use but its list omits — so the
+half that gets added is the half that answers the question.
+
+Recipes whose steps name an ingredient their list omits are recorded per recipe
+in `unlisted_in_steps` and ranked down. They are deliberately *not* auto-added:
+sampling showed roughly half are alternatives ("pork or chicken") or optional
+garnishes, so adding them would make the shopping list wrong rather than
+right.
 
 ## How safety works
 
@@ -329,4 +351,5 @@ tested without network access or API keys.
 
 ## License
 
-MIT
+Code: MIT. Recipe data: see [DATA_LICENSES.md](DATA_LICENSES.md) —
+RecipeNLG is CC BY-NC-SA 4.0, so the shipped corpus is non-commercial.

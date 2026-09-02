@@ -100,6 +100,11 @@ _RANGE = re.compile(
     r"^(\d+(?:\.\d+)?)\s*[-–]\s*[\d./¼-¾⅐-⅞]+$"
 )
 _DIGIT_LETTER = re.compile(r"(\d)\s*([a-z])")
+#: A parenthesised pack size sits between the count and the container:
+#: "1 (10 1/2 oz.) can cream of mushroom soup". Removed before tokenising so
+#: the container word is still read as the unit; the same text is dropped by
+#: normalize_name anyway, so nothing is lost by dropping it earlier.
+_PACK_SIZE = re.compile(r"\([^)]*\)")
 #: "8-ounce", "1/2-inch" -> split so the unit can be read positionally.
 _COMPOUND_MEASURE = re.compile(r"(\d)-([a-z])")
 #: Dual metric/imperial measures ("175g/6oz", "50ml/2fl oz"): the source
@@ -287,6 +292,7 @@ def parse_phrase(phrase: str) -> Ingredient | None:
     Ingredient(name='all-purpose flour', quantity=500.0, unit='g', raw='500g maida')
     """
     cleaned = phrase.strip().lower()
+    cleaned = _PACK_SIZE.sub(" ", cleaned)
     cleaned = _DUAL_MEASURE.sub(r"\1", cleaned)
     cleaned = _COMPOUND_MEASURE.sub(r"\1 \2", cleaned)
     cleaned = _DIGIT_LETTER.sub(r"\1 \2", cleaned)

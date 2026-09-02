@@ -25,7 +25,7 @@ from agents.recipe import Recipe, from_mealdb, save_recipes
 from config import PROCESSED_DATA_DIR, RAW_DATA_DIR, settings
 
 RAW_PATH = RAW_DATA_DIR / "themealdb.json"
-CORPUS_PATH = PROCESSED_DATA_DIR / "recipes.json"
+CORPUS_PATH = PROCESSED_DATA_DIR / "themealdb.json"
 
 #: Courtesy delay between requests to a free, unauthenticated public API.
 REQUEST_DELAY_SECONDS = 0.2
@@ -53,7 +53,7 @@ def normalize(raw_meals: list[dict]) -> list[Recipe]:
     for meal in raw_meals:
         recipe = from_mealdb(meal)
         if recipe.ingredients and recipe.steps:
-            recipes.append(recipe)
+            recipes.append(recipe.model_copy(update={"source": "themealdb"}))
     return recipes
 
 

@@ -19,6 +19,9 @@ data/raw/*
 data/chroma/
 # per-user USDA response cache; populates on first run
 data/processed/nutrition_cache.json
+# per-source intermediates; only the merged corpus is committed
+data/processed/themealdb.json
+data/processed/recipenlg.json
 *.sqlite3
 
 # OS / editor

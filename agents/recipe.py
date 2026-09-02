@@ -44,6 +44,7 @@ class Recipe(BaseModel):
             of TheMealDB's recipes have some, and they are as often an
             alternative ("pork or chicken") or an optional garnish as a real
             omission, so they are recorded and ranked down rather than added.
+        source: Which dataset this came from, for attribution and filtering.
         source_url: Attribution link back to the original recipe.
         thumbnail: Image URL, used by the Streamlit UI.
         tags: Free-form source tags.
@@ -56,6 +57,7 @@ class Recipe(BaseModel):
     ingredients: list[Ingredient] = Field(default_factory=list)
     steps: list[str] = Field(default_factory=list)
     unlisted_in_steps: list[str] = Field(default_factory=list)
+    source: str = ""
     source_url: str | None = None
     thumbnail: str | None = None
     tags: list[str] = Field(default_factory=list)
@@ -150,11 +152,21 @@ def from_mealdb(payload: dict) -> Recipe:
     )
 
 
-def save_recipes(recipes: list[Recipe], path: Path) -> None:
-    """Write ``recipes`` to ``path`` as a JSON array."""
+def save_recipes(recipes: list[Recipe], path: Path, *, compact: bool = True) -> None:
+    """Write ``recipes`` to ``path`` as a JSON array.
+
+    Compact by default: this is derived data, rebuilt by a script, and at
+    corpus scale the indentation costs several megabytes in the repository for
+    readability nobody uses.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = [recipe.model_dump() for recipe in recipes]
-    path.write_text(json.dumps(payload, indent=2, ensure_ascii=False))
+    text = (
+        json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+        if compact
+        else json.dumps(payload, indent=2, ensure_ascii=False)
+    )
+    path.write_text(text)
 
 
 def load_recipes(path: Path) -> list[Recipe]:
@@ -167,6 +179,6 @@ def load_recipes(path: Path) -> list[Recipe]:
     if not path.exists():
         raise FileNotFoundError(
             f"No recipe corpus at {path}. Build it with:\n"
-            f"    python -m scripts.fetch_recipes"
+            f"    python -m scripts.build_corpus"
         )
     return [Recipe.model_validate(item) for item in json.loads(path.read_text())]
