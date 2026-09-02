@@ -1,0 +1,9 @@
+# Runtime dependencies. Dev/test tooling lives in requirements-dev.txt so that
+# a deployment (Streamlit Cloud / HF Spaces) installs only what it needs.
+
+groq==1.7.0             # LLM calls (composer, substitution fallback)
+chromadb==1.5.9         # local vector store for the retrieval agent
+requests==2.34.2        # TheMealDB + USDA FoodData Central HTTP calls
+python-dotenv==1.2.3    # load .env in local development
+pydantic==2.13.5        # schema validation for all LLM output
+streamlit==1.63.0       # UI
