@@ -322,3 +322,38 @@ def _correct_word(word: str, cutoff: float) -> str:
 def canonicalize(raw: str) -> str:
     """Full name pipeline: :func:`normalize_name` then :func:`correct_spelling`."""
     return correct_spelling(normalize_name(raw))
+
+
+#: The longest ingredient name, in tokens, that step text is scanned for.
+_MAX_NAME_TOKENS = 3
+_WORD_BOUNDARY = re.compile(r"[^a-z]+")
+
+def mentioned_ingredients(text: str) -> set[str]:
+    """Find canonical ingredient names mentioned anywhere in ``text``.
+
+    Scans longest-first over 1-3 token windows so "olive oil" is recognised as
+    itself rather than as two unrelated words. Only names in the project's
+    canonical vocabulary are recognised, which keeps the check conservative:
+    an ingredient we do not know about cannot be reported as invented.
+
+    >>> sorted(mentioned_ingredients("Fry the onions, then add the chicken."))
+    ['chicken', 'onion']
+    """
+    tokens = [singularize(t) for t in _WORD_BOUNDARY.split(text.lower()) if t]
+    found: set[str] = set()
+    claimed: set[int] = set()
+    # Longest first, and a matched window consumes its positions, so "olive
+    # oil" is one ingredient rather than also counting as "olive".
+    for width in range(_MAX_NAME_TOKENS, 0, -1):
+        for start in range(len(tokens) - width + 1):
+            span = range(start, start + width)
+            if any(position in claimed for position in span):
+                continue
+            phrase = " ".join(tokens[start : start + width])
+            canonical = INGREDIENT_ALIASES.get(phrase, phrase)
+            if canonical in KNOWN_INGREDIENTS:
+                found.add(canonical)
+                claimed.update(span)
+    return found
+
+

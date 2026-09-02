@@ -123,14 +123,40 @@ pantry both canonicalize to `all-purpose flour` before they are ever compared.
 Two stages, deliberately separated:
 
 1. **Recall** — a Chroma vector search narrows the corpus to a candidate pool.
-2. **Ranking** — a pure overlap score orders that pool: what fraction of a
-   recipe's ingredients do you actually have?
+2. **Ranking** — a pure, explainable score orders that pool.
 
 No embedding distance reaches the user-visible ranking. "You have 4 of these 6
-ingredients" is a claim the critic agent can verify and the UI can explain; a
-cosine distance is neither. Common staples (salt, water, oil — salt alone is in
-298 of the 790 recipes) are assumed present and excluded from the score, but
-still reported so the composer can list them.
+ingredients" is a claim the critic can verify and the UI can explain; a cosine
+distance is neither.
+
+The score answers *"what can I cook with what I have?"* rather than *"what do I
+mostly own?"* — those turn out to be different questions. Ranking by coverage
+alone rates a flatbread of flour, water and oil a perfect match, while rating a
+supper you could make by buying one onion at 60%. So instead: every ingredient
+you already have earns a point, every one you would have to buy costs 1.5, and
+long or internally inconsistent recipes are nudged down. A `max_missing` cap
+("willing to buy" in the UI) hides anything beyond your patience.
+
+Substitutions follow the same logic: a replacement is only offered if you
+already have it. Being told to buy flaxseed instead of an egg is not help.
+
+Common staples (salt, water, oil — salt alone is in 298 of the 790 recipes) are
+assumed present and excluded, but still reported so the composer can list them.
+
+### A note on the dataset
+
+TheMealDB is a corpus of composed restaurant dishes, median 10 ingredients.
+That makes it a poor fit for strict *cook-with-what-you-have*: for a six-item
+pantry only one recipe needs nothing extra and twelve need two. The ranking
+above extracts the best available answer, and the "willing to buy" control
+makes the trade-off explicit rather than hiding it. A corpus of simple
+everyday recipes would suit the product better.
+
+About 39% of TheMealDB recipes name an ingredient in their steps that their own
+list omits. Those are recorded per recipe in `unlisted_in_steps` and ranked
+down. They are deliberately *not* auto-added to the ingredient list: sampling
+showed roughly half are alternatives ("pork or chicken") or optional garnishes,
+so adding them would make the shopping list wrong rather than right.
 
 ## How safety works
 

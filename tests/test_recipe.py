@@ -4,7 +4,14 @@ import json
 
 import pytest
 
-from agents.recipe import Recipe, from_mealdb, load_recipes, save_recipes, split_steps
+from agents.recipe import (
+    Recipe,
+    find_unlisted_in_steps,
+    from_mealdb,
+    load_recipes,
+    save_recipes,
+    split_steps,
+)
 
 
 class TestSplitSteps:
@@ -127,3 +134,50 @@ class TestRoundTrip:
         path = tmp_path / "corpus.json"
         save_recipes(sample_recipes, path)
         assert len(json.loads(path.read_text())) == len(sample_recipes)
+
+
+class TestUnlistedInSteps:
+    """A trust signal: nearly half of TheMealDB's recipes have one."""
+
+    def _ingredients(self, names):
+        from agents.ingredient import Ingredient
+
+        return [Ingredient(name=n) for n in names]
+
+    def test_finds_an_ingredient_the_list_omits(self):
+        found = find_unlisted_in_steps(
+            self._ingredients(["garlic"]), ["Tip the bread into a bowl."]
+        )
+        assert found == ["bread"]
+
+    def test_listed_ingredients_are_not_reported(self):
+        found = find_unlisted_in_steps(
+            self._ingredients(["bread", "garlic"]), ["Tip the bread into a bowl."]
+        )
+        assert found == []
+
+    def test_kitchen_staples_are_assumed(self):
+        """Every recipe uses water and salt without listing them."""
+        found = find_unlisted_in_steps(
+            self._ingredients(["rice"]), ["Boil in salted water."]
+        )
+        assert found == []
+
+    def test_a_token_of_a_listed_ingredient_is_allowed(self):
+        found = find_unlisted_in_steps(
+            self._ingredients(["chicken breast"]), ["Sear the chicken."]
+        )
+        assert found == []
+
+    def test_it_is_recorded_not_repaired(self):
+        """Recorded, never added to the ingredient list.
+
+        Half are alternatives or optional garnishes, so adding them would make
+        the shopping list wrong rather than right.
+        """
+        recipe = from_mealdb({
+            "idMeal": "1", "strMeal": "T", "strInstructions": "Serve with bread.",
+            "strIngredient1": "garlic", "strMeasure1": "1 clove",
+        })
+        assert recipe.unlisted_in_steps == ["bread"]
+        assert "bread" not in recipe.ingredient_names

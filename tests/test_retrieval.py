@@ -11,7 +11,9 @@ from agents.recipe import Recipe
 from agents.retrieval import (
     PANTRY_STAPLES,
     RecipeIndex,
+    RecipeMatch,
     RetrievalAgent,
+    cookability,
     pantry_names,
     score_overlap,
 )
@@ -219,3 +221,86 @@ class TestRetrievalWithIndex:
 
         agent = RetrievalAgent(sample_recipes, index=_StaleIndex())
         assert agent.retrieve(["egg"], top_n=2)[0].recipe.id == "3"
+
+
+def _match(title, have, need, *, ingredients=None, steps=1, unlisted=()):
+    """Build a match with the shape the ranking cares about."""
+    names = list(have) + list(need)
+    recipe = Recipe(
+        id=title,
+        title=title,
+        ingredients=[{"name": n} for n in (ingredients or names)],
+        steps=["x"] * steps,
+        unlisted_in_steps=list(unlisted),
+    )
+    return RecipeMatch(
+        recipe=recipe, score=0.0, matched=tuple(have), missing=tuple(need)
+    )
+
+
+class TestCookability:
+    """Ranking answers "what can I cook now", not "what do I mostly own"."""
+
+    def test_using_more_of_the_pantry_scores_higher(self):
+        many = _match("many", ["a", "b", "c"], [])
+        few = _match("few", ["a"], [])
+        assert cookability(many) > cookability(few)
+
+    def test_needing_a_shop_costs_more_than_an_extra_match_gains(self):
+        """One trip to the shop outweighs one more ingredient used."""
+        cook_now = _match("now", ["a", "b"], [])
+        buy_one = _match("buy", ["a", "b", "c"], ["d"])
+        assert cookability(cook_now) > cookability(buy_one)
+
+    def test_a_trivially_covered_recipe_loses_to_a_real_match(self):
+        """The flatbread problem.
+
+        One-of-one coverage scores a perfect 100% but is a useless answer next
+        to a dish that uses three things you actually have.
+        """
+        flatbread = _match("flatbread", ["olive oil"], [], steps=15)
+        supper = _match("supper", ["tomato", "garlic", "olive oil"], ["egg"])
+        assert cookability(supper) > cookability(flatbread)
+
+    def test_simpler_recipes_win_ties(self):
+        simple = _match("simple", ["a", "b"], [], ingredients=["a", "b"], steps=3)
+        complex_ = _match(
+            "complex", ["a", "b"], [], ingredients=["a", "b"] + list("cdefgh"), steps=20
+        )
+        assert cookability(simple) > cookability(complex_)
+
+    def test_recipes_whose_steps_use_unlisted_ingredients_are_nudged_down(self):
+        honest = _match("honest", ["a", "b"], [])
+        vague = _match("vague", ["a", "b"], [], unlisted=["bread", "wine"])
+        assert cookability(honest) > cookability(vague)
+
+    def test_the_reported_score_is_still_raw_coverage(self, sample_recipes):
+        """Ranking changed; what the user is told did not."""
+        agent = RetrievalAgent(sample_recipes)
+        match = agent.retrieve(["egg", "butter"], top_n=1)[0]
+        assert 0.0 <= match.score <= 1.0
+
+
+class TestMaxMissing:
+    def test_zero_returns_only_what_can_be_cooked_now(self, sample_recipes):
+        agent = RetrievalAgent(sample_recipes)
+        results = agent.retrieve(["egg", "butter", "salt"], top_n=6, max_missing=0)
+        assert results
+        assert all(m.missing == () for m in results)
+
+    def test_a_cap_bounds_the_shopping_list(self, sample_recipes):
+        agent = RetrievalAgent(sample_recipes)
+        results = agent.retrieve(["egg", "rice"], top_n=6, max_missing=2)
+        assert all(len(m.missing) <= 2 for m in results)
+
+    def test_no_cap_means_no_limit(self, sample_recipes):
+        agent = RetrievalAgent(sample_recipes)
+        uncapped = agent.retrieve(["egg"], top_n=10)
+        capped = agent.retrieve(["egg"], top_n=10, max_missing=0)
+        assert len(uncapped) >= len(capped)
+
+    def test_an_impossible_cap_returns_nothing_rather_than_a_bad_answer(
+        self, sample_recipes
+    ):
+        agent = RetrievalAgent(sample_recipes)
+        assert agent.retrieve(["chocolate"], top_n=6, max_missing=0) == []

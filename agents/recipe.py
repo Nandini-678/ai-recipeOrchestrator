@@ -17,6 +17,7 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 
 from agents.ingredient import Ingredient, parse_phrase
+from agents.normalization import mentioned_ingredients
 
 #: TheMealDB packs ingredients into strIngredient1..strIngredient20.
 _MAX_MEALDB_INGREDIENTS = 20
@@ -38,6 +39,11 @@ class Recipe(BaseModel):
         area: Cuisine of origin, when the source gives one.
         ingredients: Canonicalized ingredients, parsed from the source measures.
         steps: Instructions split into discrete, numbered-ready steps.
+        unlisted_in_steps: Ingredients the instructions name that the
+            ingredient list omits. A trust signal, not a repair: roughly half
+            of TheMealDB's recipes have some, and they are as often an
+            alternative ("pork or chicken") or an optional garnish as a real
+            omission, so they are recorded and ranked down rather than added.
         source_url: Attribution link back to the original recipe.
         thumbnail: Image URL, used by the Streamlit UI.
         tags: Free-form source tags.
@@ -49,6 +55,7 @@ class Recipe(BaseModel):
     area: str | None = None
     ingredients: list[Ingredient] = Field(default_factory=list)
     steps: list[str] = Field(default_factory=list)
+    unlisted_in_steps: list[str] = Field(default_factory=list)
     source_url: str | None = None
     thumbnail: str | None = None
     tags: list[str] = Field(default_factory=list)
@@ -102,16 +109,41 @@ def _mealdb_ingredients(payload: dict) -> list[Ingredient]:
     return parsed
 
 
+#: Words a step may use without the list naming them: things every kitchen
+#: has, plus "clove" which in a step almost always means a garlic clove.
+_ASSUMED_IN_STEPS: frozenset[str] = frozenset({
+    "water", "salt", "black pepper", "olive oil", "vegetable oil", "sugar",
+    "butter", "flour", "all-purpose flour", "ice", "clove", "stock", "broth",
+})
+
+
+def find_unlisted_in_steps(
+    ingredients: list[Ingredient], steps: list[str]
+) -> list[str]:
+    """Ingredients the steps name that ``ingredients`` does not list."""
+    listed = {item.name for item in ingredients}
+    allowed = listed | _ASSUMED_IN_STEPS | {t for name in listed for t in name.split()}
+    unlisted: set[str] = set()
+    for step in steps:
+        for name in mentioned_ingredients(step):
+            if name not in allowed and not any(t in allowed for t in name.split()):
+                unlisted.add(name)
+    return sorted(unlisted)
+
+
 def from_mealdb(payload: dict) -> Recipe:
     """Build a :class:`Recipe` from one raw TheMealDB meal record."""
     tags = (payload.get("strTags") or "").strip()
+    ingredients = _mealdb_ingredients(payload)
+    steps = split_steps(payload.get("strInstructions") or "")
     return Recipe(
         id=str(payload["idMeal"]),
         title=(payload.get("strMeal") or "").strip(),
         category=(payload.get("strCategory") or "").strip() or None,
         area=(payload.get("strArea") or "").strip() or None,
-        ingredients=_mealdb_ingredients(payload),
-        steps=split_steps(payload.get("strInstructions") or ""),
+        ingredients=ingredients,
+        steps=steps,
+        unlisted_in_steps=find_unlisted_in_steps(ingredients, steps),
         source_url=(payload.get("strSource") or "").strip() or None,
         thumbnail=(payload.get("strMealThumb") or "").strip() or None,
         tags=[tag.strip() for tag in tags.split(",") if tag.strip()],

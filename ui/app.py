@@ -216,13 +216,16 @@ def run_search(memory: MemoryStore, pantry_text: str) -> None:
     """
     avoid = st.session_state.get("avoid", [])
     servings = st.session_state.get("servings", 4)
+    max_missing = st.session_state.get("max_missing", 2)
     memory.set_preference("last_pantry", pantry_text)
 
     orchestrator = get_orchestrator(
         st.session_state.get("use_llm", True), st.session_state.get("use_usda", True)
     )
     with st.spinner("Retrieving, screening, costing and composing…"):
-        result = orchestrator.run(pantry_text, avoid=avoid, servings=servings)
+        result = orchestrator.run(
+            pantry_text, avoid=avoid, servings=servings, max_missing=max_missing
+        )
 
     memory.record_run(
         pantry_text,
@@ -267,6 +270,21 @@ def find_page(memory: MemoryStore) -> None:
             "The critic could not fully validate this one — "
             f"{result.verdict.errors[0].message}",
             icon="⚠️",
+        )
+
+    shopping = result.recipe.missing_ingredients
+    used = sum(1 for i in result.recipe.ingredients if i.have)
+    if shopping:
+        st.info(
+            f"Uses **{used}** of your ingredients. You would need to buy: "
+            f"**{', '.join(shopping)}**.",
+            icon="🛒",
+        )
+    else:
+        st.success(
+            f"Uses **{used}** of your ingredients and nothing else. "
+            "You can make this right now.",
+            icon="✅",
         )
 
     st.caption(
@@ -331,6 +349,8 @@ def sidebar(memory: MemoryStore) -> str:
         st.session_state["avoid"] = list(memory.get_preference("avoid", []))
     if "servings" not in st.session_state:
         st.session_state["servings"] = int(memory.get_preference("servings", 4))
+    if "max_missing" not in st.session_state:
+        st.session_state["max_missing"] = int(memory.get_preference("max_missing", 2))
 
     with st.sidebar:
         st.header("Preferences")
@@ -345,6 +365,14 @@ def sidebar(memory: MemoryStore) -> str:
         servings = st.number_input(
             "Servings", min_value=1, max_value=24, key="servings"
         )
+        max_missing = st.slider(
+            "Willing to buy",
+            min_value=0, max_value=5, key="max_missing",
+            help="How many ingredients you are happy to go out for. "
+                 "0 shows only what you can cook right now.",
+        )
+        if int(max_missing) != memory.get_preference("max_missing", 2):
+            memory.set_preference("max_missing", int(max_missing))
         if avoid != memory.get_preference("avoid", []):
             memory.set_preference("avoid", list(avoid))
         if int(servings) != memory.get_preference("servings", 4):

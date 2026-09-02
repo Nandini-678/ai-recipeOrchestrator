@@ -98,42 +98,57 @@ def score_overlap(
     )
 
 
-#: Pseudo-count added to the denominator when ranking. It leaves a recipe with
-#: many ingredients essentially unchanged while heavily discounting one with
-#: only a couple, which is what stops a trivially-covered recipe from winning.
-_RANK_SMOOTHING = 1.0
+#: What one ingredient you would have to buy costs, measured against one you
+#: already have. Above 1.0 because the question is "what can I cook *now*":
+#: a trip to the shop is worth more than one extra ingredient used.
+MISSING_PENALTY = 1.5
+
+#: A gentle preference for shorter recipes, per ingredient and per step. Small
+#: on purpose -- it should break ties between comparable recipes, not push a
+#: good match below a trivial one.
+COMPLEXITY_PENALTY = 0.05
+
+#: Charged per ingredient a recipe's steps use but its list omits. These are
+#: the recipes that read as though they are missing something, because they
+#: are; where two recipes are otherwise equal, prefer the honest one.
+UNLISTED_PENALTY = 0.3
 
 
-def adjusted_coverage(match: RecipeMatch) -> float:
-    """Coverage discounted for how little the recipe actually asks for.
+def cookability(
+    match: RecipeMatch,
+    *,
+    missing_penalty: float = MISSING_PENALTY,
+    complexity_penalty: float = COMPLEXITY_PENALTY,
+    unlisted_penalty: float = UNLISTED_PENALTY,
+) -> float:
+    """How well a recipe answers "what can I cook with what I have?".
 
-    Raw coverage is the honest number to *show* a user -- "you have 4 of these
-    6 ingredients" -- but it is a poor thing to *rank* by, because a recipe
-    made almost entirely of pantry staples has one countable ingredient and
-    scores a perfect 1.0 off a single match. Ranked that way, a flatbread of
-    flour, water, salt and oil beats a chicken dish using five of the six
-    things you actually have.
+    Coverage -- the fraction of a recipe you happen to own -- is the wrong
+    objective for that question. It rates a flatbread of flour, water and oil
+    a perfect match while rating a dish you could make by buying one onion at
+    60%, and it is indifferent between a five-ingredient supper and a
+    twenty-ingredient project.
 
-    Adding one to the denominator fixes the ordering without touching the
-    reported score: 1 of 1 becomes 0.50, while 5 of 6 becomes 0.71.
+    So the score counts what actually matters to someone standing in their
+    kitchen: every ingredient you already have earns a point, every one you
+    would have to go out and buy costs more than a point, and long or
+    internally inconsistent recipes are nudged down.
+
+    Higher is better. The raw coverage in :attr:`RecipeMatch.score` is left
+    alone, because "you have 4 of these 6" is still the honest thing to show.
     """
-    countable = len(match.matched) + len(match.missing)
-    if not countable:
-        return 0.0
-    return len(match.matched) / (countable + _RANK_SMOOTHING)
+    recipe = match.recipe
+    return (
+        len(match.matched)
+        - missing_penalty * len(match.missing)
+        - complexity_penalty * (len(recipe.ingredients) + len(recipe.steps))
+        - unlisted_penalty * len(recipe.unlisted_in_steps)
+    )
 
 
 def _rank_key(match: RecipeMatch) -> tuple:
-    """Sort key: adjusted coverage, then most used, then simplest, then title.
-
-    Title last keeps the ordering stable and reproducible in tests.
-    """
-    return (
-        -adjusted_coverage(match),
-        -len(match.matched),
-        len(match.recipe.ingredients),
-        match.recipe.title,
-    )
+    """Sort key: cookability, then title for a stable, reproducible order."""
+    return (-cookability(match), match.recipe.title)
 
 
 class RecipeIndex:
@@ -243,6 +258,7 @@ class RetrievalAgent:
         candidate_pool: int = 60,
         assume_staples: bool = True,
         min_coverage: float = 0.0,
+        max_missing: int | None = None,
     ) -> list[RecipeMatch]:
         """Return the ``top_n`` best-covered recipes for a pantry.
 
@@ -252,11 +268,14 @@ class RetrievalAgent:
             candidate_pool: How many recipes the index stage recalls before
                 ranking. Ignored when no index is attached.
             assume_staples: Passed through to :func:`score_overlap`.
-            min_coverage: Drop matches scoring below this threshold.
+            min_coverage: Drop matches whose raw coverage is below this.
+            max_missing: Drop matches needing more than this many ingredients
+                the pantry lacks. ``None`` means no limit; ``0`` means only
+                recipes that can be cooked right now.
 
         Returns:
-            Matches sorted best-first. Empty when the pantry is empty, since
-            every recipe would otherwise tie at zero coverage.
+            Matches sorted by :func:`cookability`, best first. Empty when the
+            pantry is empty, since every recipe would otherwise tie at zero.
         """
         pantry = pantry_names(ingredients)
         if not pantry:
@@ -267,6 +286,12 @@ class RetrievalAgent:
             score_overlap(pantry, recipe, assume_staples=assume_staples)
             for recipe in candidates
         ]
-        keep = [m for m in scored if m.score >= min_coverage and m.matched]
+        keep = [
+            m
+            for m in scored
+            if m.matched
+            and m.score >= min_coverage
+            and (max_missing is None or len(m.missing) <= max_missing)
+        ]
         keep.sort(key=_rank_key)
         return keep[:top_n]

@@ -233,7 +233,7 @@ class TestNormalizeAllergens:
 
 class TestSuggestSubstitution:
     def test_returns_the_best_table_candidate(self):
-        result = suggest_substitution("butter")
+        result = suggest_substitution("butter", require_in_pantry=False)
         assert result.replacement == "olive oil"
         assert result.ratio == 0.75
         assert result.source == "table"
@@ -248,7 +248,9 @@ class TestSuggestSubstitution:
         assert suggest_substitution("buttermilk", avoid={"dairy"}) is None
 
     def test_falls_through_to_the_next_safe_candidate(self):
-        result = suggest_substitution("peanut butter", avoid={"tree nut"})
+        result = suggest_substitution(
+            "peanut butter", avoid={"tree nut"}, require_in_pantry=False
+        )
         assert result.replacement == "sunflower seed butter"
 
     def test_unknown_ingredient_without_an_advisor_returns_none(self):
@@ -268,7 +270,9 @@ class TestSuggestSubstitution:
         def advisor(missing, avoid):
             return Substitution(original=missing, replacement="jackfruit", ratio=2.0)
 
-        result = suggest_substitution("dragonfruit", advisor=advisor)
+        result = suggest_substitution(
+            "dragonfruit", advisor=advisor, require_in_pantry=False
+        )
         assert result.replacement == "jackfruit"
         assert result.ratio == 2.0
         assert result.source == "llm"
@@ -292,7 +296,8 @@ class TestSuggestSubstitution:
             return Substitution(original=missing, replacement="jackfruit")
 
         result = suggest_substitution(
-            "dragonfruit", pantry={"jackfruit"}, advisor=advisor
+            "dragonfruit", pantry={"jackfruit"}, advisor=advisor,
+            require_in_pantry=False,
         )
         assert result.in_pantry is True
 
@@ -520,18 +525,25 @@ class TestSubstitutionCap:
 
     def test_no_more_than_the_cap_is_substituted(self):
         missing = ["butter", "milk", "honey", "sugar", "rice", "cilantro"]
-        screened = SafetyAgent().screen([self._match_missing(missing)])[0]
+        pantry = {"olive oil", "oat milk", "maple syrup", "honey", "quinoa", "parsley"}
+        screened = SafetyAgent().screen(
+            [self._match_missing(missing)], pantry=pantry
+        )[0]
         assert len(screened.substitutions) == MAX_SUBSTITUTIONS_PER_RECIPE
 
     def test_the_rest_are_reported_unresolved_not_dropped(self):
         missing = ["butter", "milk", "honey", "sugar", "rice", "cilantro"]
-        screened = SafetyAgent().screen([self._match_missing(missing)])[0]
+        pantry = {"olive oil", "oat milk", "maple syrup", "honey", "quinoa", "parsley"}
+        screened = SafetyAgent().screen(
+            [self._match_missing(missing)], pantry=pantry
+        )[0]
         assert len(screened.substitutions) + len(screened.unresolved) == len(missing)
 
     def test_the_cap_is_configurable(self):
         missing = ["butter", "milk", "honey"]
         screened = SafetyAgent(max_substitutions=1).screen(
-            [self._match_missing(missing)]
+            [self._match_missing(missing)],
+            pantry={"olive oil", "oat milk", "maple syrup"},
         )[0]
         assert len(screened.substitutions) == 1
 
@@ -539,4 +551,45 @@ class TestSubstitutionCap:
         """The advisor proposed dairy milk for it; the table does better."""
         from agents.safety import suggest_substitution
 
-        assert suggest_substitution("coconut milk").replacement == "coconut cream"
+        found = suggest_substitution("coconut milk", require_in_pantry=False)
+        assert found.replacement == "coconut cream"
+
+
+class TestSubstituteOnlyWithWhatYouHave:
+    """A substitution should remove a trip to the shop, not relocate it."""
+
+    def test_nothing_is_suggested_when_the_replacement_is_also_missing(self):
+        """Being told to buy flaxseed instead of an egg is not help."""
+        assert suggest_substitution("egg", pantry=set()) is None
+
+    def test_something_you_own_is_suggested(self):
+        found = suggest_substitution("butter", pantry={"olive oil"})
+        assert found.replacement == "olive oil"
+        assert found.in_pantry is True
+
+    def test_the_advisor_is_not_consulted_by_default(self):
+        """It can only ever propose something the user does not have."""
+        calls = []
+
+        def advisor(missing, avoid):
+            calls.append(missing)
+            return Substitution(original=missing, replacement="jackfruit")
+
+        assert suggest_substitution("dragonfruit", advisor=advisor) is None
+        assert calls == []
+
+    def test_allergen_mode_still_offers_a_replacement_you_lack(self):
+        """Avoiding an allergen is worth a shop; a missing ingredient is not."""
+        found = suggest_substitution("butter", require_in_pantry=False)
+        assert found.replacement == "olive oil"
+
+    def test_the_agent_defaults_to_pantry_only(self):
+        from agents.recipe import Recipe
+
+        recipe = Recipe(
+            id="1", title="T", ingredients=[{"name": "egg"}], steps=["x"]
+        )
+        match = RecipeMatch(recipe=recipe, score=0.0, missing=("egg",))
+        screened = SafetyAgent().screen([match], pantry=set())[0]
+        assert screened.substitutions == ()
+        assert screened.unresolved == ("egg",)

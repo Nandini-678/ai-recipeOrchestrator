@@ -13,16 +13,10 @@ olive oil". Vague criticism produces vague corrections.
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 
 from agents.composer import ComposedRecipe
-from agents.normalization import (
-    INGREDIENT_ALIASES,
-    KNOWN_INGREDIENTS,
-    canonicalize,
-    singularize,
-)
+from agents.normalization import canonicalize, mentioned_ingredients
 from agents.safety import ScreenedMatch, detect_allergens, normalize_allergens
 
 #: Ingredients a step may mention without them being in the list: things every
@@ -34,10 +28,6 @@ ALWAYS_ALLOWED: frozenset[str] = frozenset({
     # not the spice; "stock" and "broth" are used interchangeably in prose.
     "clove", "stock", "broth",
 })
-
-#: The longest ingredient name, in tokens, that we scan step text for.
-_MAX_NAME_TOKENS = 3
-_WORD = re.compile(r"[^a-z]+")
 
 SEVERITY_ERROR = "error"
 SEVERITY_WARNING = "warning"
@@ -84,35 +74,6 @@ class Verdict:
     def feedback(self) -> list[str]:
         """Blocking messages, for the composer's retry prompt."""
         return [f.message for f in self.errors]
-
-
-def mentioned_ingredients(text: str) -> set[str]:
-    """Find canonical ingredient names mentioned anywhere in ``text``.
-
-    Scans longest-first over 1-3 token windows so "olive oil" is recognised as
-    itself rather than as two unrelated words. Only names in the project's
-    canonical vocabulary are recognised, which keeps the check conservative:
-    an ingredient we do not know about cannot be reported as invented.
-
-    >>> sorted(mentioned_ingredients("Fry the onions, then add the chicken."))
-    ['chicken', 'onion']
-    """
-    tokens = [singularize(t) for t in _WORD.split(text.lower()) if t]
-    found: set[str] = set()
-    claimed: set[int] = set()
-    # Longest first, and a matched window consumes its positions, so "olive
-    # oil" is one ingredient rather than also counting as "olive".
-    for width in range(_MAX_NAME_TOKENS, 0, -1):
-        for start in range(len(tokens) - width + 1):
-            span = range(start, start + width)
-            if any(position in claimed for position in span):
-                continue
-            phrase = " ".join(tokens[start : start + width])
-            canonical = INGREDIENT_ALIASES.get(phrase, phrase)
-            if canonical in KNOWN_INGREDIENTS:
-                found.add(canonical)
-                claimed.update(span)
-    return found
 
 
 class CriticAgent:

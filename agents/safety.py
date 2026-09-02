@@ -395,23 +395,29 @@ def suggest_substitution(
     pantry: Iterable[str] = (),
     avoid: Iterable[str] = (),
     advisor: SubstitutionAdvisor | None = None,
+    require_in_pantry: bool = True,
 ) -> Substitution | None:
     """Find a safe replacement for one missing ingredient.
 
-    Preference order: something the user already has, then the best curated
-    candidate, then an advisor suggestion. Every candidate -- curated or
-    model-supplied -- is screened against ``avoid`` before it can be returned.
+    Every candidate -- curated or model-supplied -- is screened against
+    ``avoid`` before it can be returned.
 
     Args:
         missing: Canonical name of the ingredient to replace.
-        pantry: Canonical names the user has, used to prefer a candidate they
-            can act on immediately.
+        pantry: Canonical names the user has.
         avoid: Allergens to screen against, in any accepted spelling.
         advisor: Optional LLM fallback, consulted only when the table has no
-            safe candidate.
+            safe candidate. Not reached when ``require_in_pantry`` is set,
+            since a suggested replacement is by definition not in the pantry.
+        require_in_pantry: Only substitute with something the user already has.
+            On by default, because the point of a substitution is to remove a
+            trip to the shop. Swapping a missing egg for missing flaxseed does
+            not do that -- it replaces one purchase with a stranger one. Turn
+            it off when the goal is avoiding an allergen rather than a trip.
 
     Returns:
-        The chosen :class:`Substitution`, or ``None`` when nothing safe exists.
+        The chosen :class:`Substitution`, or ``None`` when nothing safe and
+        usable exists.
     """
     allergens = normalize_allergens(avoid)
     have = set(pantry)
@@ -429,9 +435,13 @@ def suggest_substitution(
         for replacement, ratio, unit, note in SUBSTITUTIONS.get(missing, ())
         if not (detect_allergens(replacement) & allergens)
     ]
+    owned = next((s for s in safe if s.in_pantry), None)
+    if owned is not None:
+        return owned
+    if require_in_pantry:
+        return None
     if safe:
-        # A candidate the user already has beats a better one they do not.
-        return next((s for s in safe if s.in_pantry), safe[0])
+        return safe[0]
 
     if advisor is None:
         return None
@@ -524,6 +534,7 @@ class SafetyAgent:
         self,
         advisor: SubstitutionAdvisor | None = None,
         max_substitutions: int = MAX_SUBSTITUTIONS_PER_RECIPE,
+        require_in_pantry: bool = True,
     ) -> None:
         """Build the agent.
 
@@ -531,9 +542,12 @@ class SafetyAgent:
             advisor: Optional LLM fallback for uncovered substitutions.
             max_substitutions: Most replacements to apply to one recipe;
                 beyond this, gaps are reported as unresolved.
+            require_in_pantry: Only substitute with something the user has, so
+                a substitution always removes a purchase rather than moving it.
         """
         self._advisor = advisor
         self._max_substitutions = max_substitutions
+        self._require_in_pantry = require_in_pantry
 
     def find_violations(
         self, recipe, avoid: frozenset[str]
@@ -585,7 +599,11 @@ class SafetyAgent:
                     unresolved.append(missing)
                     continue
                 found = suggest_substitution(
-                    missing, pantry=have, avoid=allergens, advisor=self._advisor
+                    missing,
+                    pantry=have,
+                    avoid=allergens,
+                    advisor=self._advisor,
+                    require_in_pantry=self._require_in_pantry,
                 )
                 if found:
                     substitutions.append(found)

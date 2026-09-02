@@ -124,6 +124,7 @@ class RecipeOrchestrator:
         avoid: Iterable[str] = (),
         servings: int = 4,
         top_n: int = 10,
+        max_missing: int | None = None,
     ) -> PipelineResult:
         """Turn raw pantry text into a validated recipe.
 
@@ -132,6 +133,8 @@ class RecipeOrchestrator:
             avoid: Allergens to exclude, in any accepted spelling.
             servings: Servings to scale nutrition to.
             top_n: How many recipes retrieval should rank before screening.
+            max_missing: Most ingredients the user is willing to go and buy.
+                ``0`` restricts results to what is cookable right now.
 
         Returns:
             A :class:`PipelineResult`. ``accepted`` says whether the critic
@@ -146,12 +149,18 @@ class RecipeOrchestrator:
             )
 
         pantry_names = {item.name for item in pantry}
-        matches = self._retrieval.retrieve(pantry, top_n=top_n)
+        matches = self._retrieval.retrieve(
+            pantry, top_n=top_n, max_missing=max_missing
+        )
         if not matches:
-            return PipelineResult(
-                pantry=tuple(pantry),
-                reason="No recipe in the corpus uses any of those ingredients.",
-            )
+            if max_missing is not None:
+                reason = (
+                    f"Nothing can be made with at most {max_missing} extra "
+                    "ingredient(s). Allow a couple more and try again."
+                )
+            else:
+                reason = "No recipe in the corpus uses any of those ingredients."
+            return PipelineResult(pantry=tuple(pantry), reason=reason)
 
         screened = self._safety.screen(matches, pantry=pantry_names, avoid=avoid)
         if not screened:
