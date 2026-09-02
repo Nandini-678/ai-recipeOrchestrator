@@ -465,7 +465,7 @@
         "raw": "200g Almonds"
       },
       {
-        "name": "extra virgin olive oil",
+        "name": "olive oil",
         "quantity": 50.0,
         "unit": "ml",
         "raw": "50 ml Extra Virgin Olive Oil"
@@ -1185,7 +1185,7 @@
         "raw": "1/2 tsp Salt"
       },
       {
-        "name": "unsalted butter",
+        "name": "butter",
         "quantity": 25.0,
         "unit": "g",
         "raw": "25g Unsalted Butter"
@@ -1387,7 +1387,7 @@
         "raw": "200g/7oz Bramley apples"
       },
       {
-        "name": "salted butter",
+        "name": "butter",
         "quantity": 75.0,
         "unit": "g",
         "raw": "75g/3oz Salted Butter"
@@ -1399,7 +1399,7 @@
         "raw": "75g/3oz caster sugar"
       },
       {
-        "name": "free orange egg",
+        "name": "egg",
         "quantity": 2.0,
         "unit": null,
         "raw": "2 free-range eggs, beaten"
@@ -1525,7 +1525,7 @@
         "raw": "1 tsp Salt"
       },
       {
-        "name": "unsalted butter",
+        "name": "butter",
         "quantity": 4.0,
         "unit": "oz",
         "raw": "4 oz Unsalted Butter"
@@ -1561,7 +1561,7 @@
         "raw": "1 tsp Cinnamon"
       },
       {
-        "name": "unsalted butter",
+        "name": "butter",
         "quantity": 3.0,
         "unit": "tbsp",
         "raw": "3  tablespoons Unsalted Butter"
@@ -1951,7 +1951,7 @@
         "raw": "200g Cheese"
       },
       {
-        "name": "extra virgin olive oil",
+        "name": "olive oil",
         "quantity": null,
         "unit": "pinch",
         "raw": "Pinch Extra Virgin Olive Oil"
@@ -2084,7 +2084,7 @@
     "area": "Spanish",
     "ingredients": [
       {
-        "name": "extra virgin olive oil",
+        "name": "olive oil",
         "quantity": 2.0,
         "unit": "tbsp",
         "raw": "2 tbsp Extra Virgin Olive Oil"
@@ -2439,7 +2439,7 @@
         "raw": "Juice of 1/2 Lemon"
       },
       {
-        "name": "splash extra virgin olive oil",
+        "name": "splash olive oil",
         "quantity": null,
         "unit": null,
         "raw": "Splash Extra Virgin Olive Oil"
@@ -2909,7 +2909,7 @@
         "raw": "3  tablespoons Tahini"
       },
       {
-        "name": "extra virgin olive oil",
+        "name": "olive oil",
         "quantity": 3.0,
         "unit": "tbsp",
         "raw": "3  tablespoons Extra Virgin Olive Oil"
@@ -3643,7 +3643,7 @@
         "raw": "2 large Yuca"
       },
       {
-        "name": "extra virgin olive oil",
+        "name": "olive oil",
         "quantity": 2.0,
         "unit": "tbsp",
         "raw": "2 tablespoons Extra Virgin Olive Oil"
@@ -3758,7 +3758,7 @@
         "raw": "125g/4½oz ground almonds"
       },
       {
-        "name": "free orange egg",
+        "name": "egg",
         "quantity": 1.0,
         "unit": null,
         "raw": "1 free-range egg, beaten"
@@ -3866,7 +3866,7 @@
         "raw": "1 tablespoon Vanilla Bean Paste"
       },
       {
-        "name": "unsalted butter",
+        "name": "butter",
         "quantity": 250.0,
         "unit": "g",
         "raw": "250g Unsalted Butter"
@@ -5072,7 +5072,7 @@
         "raw": "2 tbs Mustard"
       },
       {
-        "name": "free orange egg yolk",
+        "name": "egg yolk",
         "quantity": 2.0,
         "unit": null,
         "raw": "2 free-range Egg Yolks"
@@ -6470,7 +6470,7 @@
         "raw": "2 Star Anise"
       },
       {
-        "name": "cilantro seed",
+        "name": "coriander seed",
         "quantity": 1.0,
         "unit": "tsp",
         "raw": "1 tsp Coriander Seeds"
@@ -7438,7 +7438,7 @@
         "raw": "1 small finely diced Onion"
       },
       {
-        "name": "unsalted butter",
+        "name": "butter",
         "quantity": 3.0,
         "unit": "tbsp",
         "raw": "3  tablespoons Unsalted Butter"
@@ -7561,7 +7561,7 @@
         "raw": "2 Bay Leaf"
       },
       {
-        "name": "unsalted butter",
+        "name": "butter",
         "quantity": 1.0,
         "unit": "tbsp",
         "raw": "1 tablespoon Unsalted Butter"
@@ -8286,7 +8286,7 @@
     "area": null,
     "ingredients": [
       {
-        "name": "extra virgin olive oil",
+        "name": "olive oil",
         "quantity": 2.0,
         "unit": "tbsp",
         "raw": "2 tablespoons Extra Virgin Olive Oil"
@@ -8661,7 +8661,7 @@
     "area": "Australian",
     "ingredients": [
       {
-        "name": "unsalted butter",
+        "name": "butter",
         "quantity": 100.0,
         "unit": "g",
         "raw": "100g Unsalted Butter"
@@ -9440,7 +9440,7 @@
         "raw": "250ml Whole Milk"
       },
       {
-        "name": "unsalted butter",
+        "name": "butter",
         "quantity": 125.0,
         "unit": "g",
         "raw": "125g Unsalted Butter"
@@ -9491,7 +9491,7 @@
     "area": null,
     "ingredients": [
       {
-        "name": "unsalted butter",
+        "name": "butter",
         "quantity": 3.0,
         "unit": "tbsp",
         "raw": "3  tablespoons Unsalted Butter"
@@ -9588,7 +9588,7 @@
         "raw": "50ml/2fl oz double cream"
       },
       {
-        "name": "free orange egg",
+        "name": "egg",
         "quantity": 2.0,
         "unit": null,
         "raw": "2 free-range eggs"
@@ -10786,7 +10786,7 @@
     "area": "Russian",
     "ingredients": [
       {
-        "name": "unsalted butter",
+        "name": "butter",
         "quantity": 3.0,
         "unit": "tbsp",
         "raw": "3 tbs Unsalted Butter"
@@ -11004,7 +11004,7 @@
         "raw": "2 tsp Lemon Juice"
       },
       {
-        "name": "extra virgin olive oil",
+        "name": "olive oil",
         "quantity": 1.0,
         "unit": "tbsp",
         "raw": "1 tablespoon Extra Virgin Olive Oil"
@@ -12573,7 +12573,7 @@
         "raw": "12 Phyllo Dough"
       },
       {
-        "name": "unsalted butter",
+        "name": "butter",
         "quantity": 1.5,
         "unit": "cup",
         "raw": "1 1/2 cups Unsalted Butter"
@@ -13951,7 +13951,7 @@
         "raw": "200g Butter"
       },
       {
-        "name": "free orange egg",
+        "name": "egg",
         "quantity": 1.0,
         "unit": null,
         "raw": "1 Free-range Egg, Beaten"
@@ -13963,7 +13963,7 @@
         "raw": "1 tbls Cold Water"
       },
       {
-        "name": "free orange egg",
+        "name": "egg",
         "quantity": 1.0,
         "unit": null,
         "raw": "1 Free-range Egg, Beaten"
@@ -14037,7 +14037,7 @@
         "raw": "2 tsp Cumin seeds"
       },
       {
-        "name": "cilantro seed",
+        "name": "coriander seed",
         "quantity": 3.0,
         "unit": "tsp",
         "raw": "3 tsp Coriander seeds"
@@ -15205,7 +15205,7 @@
     "area": "Spanish",
     "ingredients": [
       {
-        "name": "extra virgin olive oil",
+        "name": "olive oil",
         "quantity": 4.0,
         "unit": "tbsp",
         "raw": "4 tablespoons Extra Virgin Olive Oil"
@@ -16314,7 +16314,7 @@
         "raw": "80g Cornstarch"
       },
       {
-        "name": "unsweetened cocoa",
+        "name": "cocoa",
         "quantity": 30.0,
         "unit": "g",
         "raw": "30g Unsweetened Cocoa"
@@ -16688,7 +16688,7 @@
         "raw": "250g All purpose flour"
       },
       {
-        "name": "unsweetened cocoa",
+        "name": "cocoa",
         "quantity": 25.0,
         "unit": "g",
         "raw": "25g Unsweetened Cocoa"
@@ -16830,7 +16830,7 @@
         "raw": "100g Milk Chocolate"
       },
       {
-        "name": "salted butter",
+        "name": "butter",
         "quantity": 250.0,
         "unit": "g",
         "raw": "250g Salted Butter"
@@ -17289,7 +17289,7 @@
         "raw": "1 tablespoon Sherry vinegar"
       },
       {
-        "name": "tblsp extra virgin olive oil",
+        "name": "tblsp olive oil",
         "quantity": 2.0,
         "unit": null,
         "raw": "2 tblsp Extra Virgin Olive Oil"
@@ -17556,7 +17556,7 @@
     "area": "British",
     "ingredients": [
       {
-        "name": "salted butter",
+        "name": "butter",
         "quantity": 250.0,
         "unit": "g",
         "raw": "250g salted butter"
@@ -17951,7 +17951,7 @@
     "area": "Norway",
     "ingredients": [
       {
-        "name": "unsalted butter",
+        "name": "butter",
         "quantity": 100.0,
         "unit": "g",
         "raw": "100g Unsalted Butter"
@@ -18011,7 +18011,7 @@
         "raw": "Dash Olive Oil"
       },
       {
-        "name": "unsalted butter",
+        "name": "butter",
         "quantity": 75.0,
         "unit": "g",
         "raw": "75g Unsalted Butter"
@@ -18067,7 +18067,7 @@
         "raw": "250g Plain Flour"
       },
       {
-        "name": "unsalted butter",
+        "name": "butter",
         "quantity": 180.0,
         "unit": "g",
         "raw": "180g Unsalted Butter"
@@ -19819,7 +19819,7 @@
     "area": "British",
     "ingredients": [
       {
-        "name": "unsalted butter",
+        "name": "butter",
         "quantity": 3.0,
         "unit": "tbsp",
         "raw": "3  tablespoons Unsalted Butter"
@@ -19926,7 +19926,7 @@
         "raw": "2 cups All purpose flour"
       },
       {
-        "name": "unsalted butter",
+        "name": "butter",
         "quantity": 0.5,
         "unit": "cup",
         "raw": "1/2 cup Unsalted Butter"
@@ -21150,7 +21150,7 @@
         "raw": "8 oz Cuban Bread"
       },
       {
-        "name": "unsalted butter",
+        "name": "butter",
         "quantity": 1.0,
         "unit": "tbsp",
         "raw": "1 tablespoon Unsalted Butter"
@@ -21677,7 +21677,7 @@
         "raw": "1/4 tsp Salt"
       },
       {
-        "name": "unsalted butter",
+        "name": "butter",
         "quantity": 1.0,
         "unit": "cup",
         "raw": "1 cup Unsalted Butter"
@@ -22235,7 +22235,7 @@
         "raw": "7 oz Maria Cookies"
       },
       {
-        "name": "unsalted butter",
+        "name": "butter",
         "quantity": 0.5,
         "unit": "cup",
         "raw": "1/2 cup Unsalted Butter"
@@ -22253,7 +22253,7 @@
         "raw": "16 oz Cream Cheese"
       },
       {
-        "name": "sweetened condensed milk",
+        "name": "condensed milk",
         "quantity": 1.0,
         "unit": "can",
         "raw": "1 Can Sweetened Condensed Milk"
@@ -22694,7 +22694,7 @@
         "raw": "250g All purpose flour"
       },
       {
-        "name": "unsalted butter",
+        "name": "butter",
         "quantity": 120.0,
         "unit": "g",
         "raw": "120g Unsalted Butter"
@@ -22730,7 +22730,7 @@
         "raw": "120g Brown Sugar"
       },
       {
-        "name": "unsalted butter",
+        "name": "butter",
         "quantity": 80.0,
         "unit": "g",
         "raw": "80g Unsalted Butter"
@@ -22896,7 +22896,7 @@
     "area": "Spanish",
     "ingredients": [
       {
-        "name": "extra virgin olive oil",
+        "name": "olive oil",
         "quantity": 2.0,
         "unit": "tbsp",
         "raw": "2 tbsp Extra Virgin Olive Oil"
@@ -23265,7 +23265,7 @@
     "area": "Chinese",
     "ingredients": [
       {
-        "name": "unsalted beef stock",
+        "name": "beef stock",
         "quantity": 1.0,
         "unit": "cup",
         "raw": "1 cup Unsalted Beef Stock"
@@ -24176,7 +24176,7 @@
         "raw": "1 tablespoon Dried Mint"
       },
       {
-        "name": "extra virgin olive oil",
+        "name": "olive oil",
         "quantity": 60.0,
         "unit": "ml",
         "raw": "60 ml Extra Virgin Olive Oil"
@@ -24714,7 +24714,7 @@
         "raw": "1/4 tsp Salt"
       },
       {
-        "name": "unsalted butter",
+        "name": "butter",
         "quantity": 1.0,
         "unit": "cup",
         "raw": "1 cup Unsalted Butter"
@@ -25838,7 +25838,7 @@
         "raw": "1 tablespoon Mustard"
       },
       {
-        "name": "unsalted butter",
+        "name": "butter",
         "quantity": 1.0,
         "unit": "tbsp",
         "raw": "1 tablespoon Unsalted Butter"
@@ -28319,7 +28319,7 @@
         "raw": "For frying Sunflower Oil"
       },
       {
-        "name": "extra virgin olive oil",
+        "name": "olive oil",
         "quantity": 4.0,
         "unit": "tbsp",
         "raw": "4 tbsp Extra Virgin Olive Oil"
@@ -30058,7 +30058,7 @@
         "raw": "1/4 tsp Ground Allspice"
       },
       {
-        "name": "sweetened condensed milk",
+        "name": "condensed milk",
         "quantity": 0.5,
         "unit": "cup",
         "raw": "1/2 cup Sweetened Condensed Milk"
@@ -30348,7 +30348,7 @@
         "raw": "3 cloves Chopped Garlic"
       },
       {
-        "name": "unsweetened coconut milk",
+        "name": "coconut milk",
         "quantity": 380.0,
         "unit": "g",
         "raw": "380g Unsweetened Coconut Milk"
@@ -30824,7 +30824,7 @@
         "raw": "1/4 cup Honey"
       },
       {
-        "name": "unsalted butter",
+        "name": "butter",
         "quantity": 4.0,
         "unit": "tbsp",
         "raw": "4 tablespoons Unsalted Butter"
@@ -30947,7 +30947,7 @@
         "raw": "2 tablespoons Olive Oil"
       },
       {
-        "name": "unsalted butter",
+        "name": "butter",
         "quantity": 4.0,
         "unit": "tbsp",
         "raw": "4 tablespoons Unsalted Butter"
@@ -32986,7 +32986,7 @@
         "raw": "400g Knafeh"
       },
       {
-        "name": "unsalted butter",
+        "name": "butter",
         "quantity": 6.0,
         "unit": "tbsp",
         "raw": "6 tablespoons Unsalted Butter"
@@ -35033,7 +35033,7 @@
     "area": "Australian",
     "ingredients": [
       {
-        "name": "salted butter",
+        "name": "butter",
         "quantity": 125.0,
         "unit": "g",
         "raw": "125g Salted Butter"
@@ -35093,7 +35093,7 @@
         "raw": "350g Desiccated Coconut"
       },
       {
-        "name": "unsalted butter",
+        "name": "butter",
         "quantity": 80.0,
         "unit": "g",
         "raw": "80g Unsalted Butter"
@@ -36684,7 +36684,7 @@
         "raw": "25g Sunflower Oil"
       },
       {
-        "name": "unsalted butter",
+        "name": "butter",
         "quantity": 250.0,
         "unit": "g",
         "raw": "250g Unsalted Butter"
@@ -37753,7 +37753,7 @@
         "raw": "350 g farfalle"
       },
       {
-        "name": "extra virgin olive oil",
+        "name": "olive oil",
         "quantity": 3.0,
         "unit": "tbsp",
         "raw": "3  tablespoons extra virgin olive oil"
@@ -38261,7 +38261,7 @@
         "raw": "2 1/2 Tsp Salt"
       },
       {
-        "name": "tblsp unsalted butter",
+        "name": "tblsp butter",
         "quantity": 10.0,
         "unit": null,
         "raw": "10 tblsp Unsalted Butter"
@@ -41023,7 +41023,7 @@
         "raw": "3 chopped Tomato"
       },
       {
-        "name": "splash extra virgin olive oil",
+        "name": "splash olive oil",
         "quantity": null,
         "unit": null,
         "raw": "Splash Extra Virgin Olive Oil"
@@ -41920,7 +41920,7 @@
     "area": null,
     "ingredients": [
       {
-        "name": "unsalted peanut",
+        "name": "peanut",
         "quantity": 5.0,
         "unit": "cup",
         "raw": "5 Cups Unsalted Peanuts"
@@ -42987,7 +42987,7 @@
     "area": "Polish",
     "ingredients": [
       {
-        "name": "unsalted butter",
+        "name": "butter",
         "quantity": 140.0,
         "unit": "g",
         "raw": "140g Unsalted Butter"
@@ -43463,7 +43463,7 @@
         "raw": "6 tablespoons White Chocolate"
       },
       {
-        "name": "unsalted pistachio",
+        "name": "pistachio",
         "quantity": 1.0,
         "unit": "cup",
         "raw": "1 cup Unsalted Pistachio"
@@ -44098,7 +44098,7 @@
         "raw": "Pinch Saffron"
       },
       {
-        "name": "extra virgin olive oil",
+        "name": "olive oil",
         "quantity": 4.0,
         "unit": "tbsp",
         "raw": "4 tbsp Extra Virgin Olive Oil"
@@ -47995,7 +47995,7 @@
         "raw": "2 sliced Aubergine"
       },
       {
-        "name": "extra virgin olive oil",
+        "name": "olive oil",
         "quantity": 3.0,
         "unit": "tbsp",
         "raw": "3  tablespoons Extra Virgin Olive Oil"
@@ -49266,7 +49266,7 @@
         "raw": "3 Yolkes Egg"
       },
       {
-        "name": "unsalted butter",
+        "name": "butter",
         "quantity": 125.0,
         "unit": "g",
         "raw": "125g Unsalted Butter"
@@ -50195,7 +50195,7 @@
         "raw": "2 tsp Salt"
       },
       {
-        "name": "unsalted butter",
+        "name": "butter",
         "quantity": 1.0,
         "unit": "cup",
         "raw": "1 cup Unsalted Butter"
@@ -50249,7 +50249,7 @@
         "raw": "3  tablespoons Cornstarch"
       },
       {
-        "name": "unsalted butter",
+        "name": "butter",
         "quantity": 2.0,
         "unit": "tbsp",
         "raw": "2 tablespoons Unsalted Butter"
@@ -51077,7 +51077,7 @@
         "raw": "250g Tomato"
       },
       {
-        "name": "extra virgin olive oil",
+        "name": "olive oil",
         "quantity": 40.0,
         "unit": "ml",
         "raw": "40 ml Extra Virgin Olive Oil"
@@ -53201,7 +53201,7 @@
         "raw": "1/2 Red Pepper"
       },
       {
-        "name": "extra virgin olive oil",
+        "name": "olive oil",
         "quantity": 3.0,
         "unit": "tbsp",
         "raw": "3  tablespoons Extra Virgin Olive Oil"
@@ -54015,7 +54015,7 @@
         "raw": "Handful Parsley"
       },
       {
-        "name": "drizzle extra virgin olive oil",
+        "name": "drizzle olive oil",
         "quantity": null,
         "unit": null,
         "raw": "Drizzle Extra Virgin Olive Oil"
@@ -56194,7 +56194,7 @@
         "raw": "1 tsp Lemon Juice"
       },
       {
-        "name": "unsalted butter",
+        "name": "butter",
         "quantity": 2.0,
         "unit": "tbsp",
         "raw": "2 tbs Unsalted Butter"
@@ -57402,7 +57402,7 @@
         "raw": "5 tablespoons Sherry vinegar"
       },
       {
-        "name": "extra virgin olive oil",
+        "name": "olive oil",
         "quantity": 2.0,
         "unit": "tbsp",
         "raw": "2 tablespoons Extra Virgin Olive Oil"
@@ -62333,7 +62333,7 @@
         "raw": "70g Vermicelli Pasta"
       },
       {
-        "name": "unsalted butter",
+        "name": "butter",
         "quantity": 30.0,
         "unit": "g",
         "raw": "30g Unsalted Butter"
@@ -62801,7 +62801,7 @@
         "raw": "3 Lbs Small Potatoes"
       },
       {
-        "name": "salted butter",
+        "name": "butter",
         "quantity": 0.5,
         "unit": "cup",
         "raw": "1/2 cup Salted Butter"
@@ -64817,7 +64817,7 @@
         "raw": "4 Tomato"
       },
       {
-        "name": "extra virgin olive oil",
+        "name": "olive oil",
         "quantity": 1.0,
         "unit": "tbsp",
         "raw": "1 tbsp Extra Virgin Olive Oil"
@@ -64841,7 +64841,7 @@
         "raw": "16 Jersey Royal Potatoes"
       },
       {
-        "name": "tblsp extra virgin olive oil",
+        "name": "tblsp olive oil",
         "quantity": 2.0,
         "unit": null,
         "raw": "2 tblsp Extra Virgin Olive Oil"
@@ -65347,7 +65347,7 @@
         "raw": "1 medium Egg"
       },
       {
-        "name": "unsalted butter",
+        "name": "butter",
         "quantity": 75.0,
         "unit": "g",
         "raw": "75g Unsalted Butter"

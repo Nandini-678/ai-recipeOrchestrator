@@ -126,6 +126,27 @@ cosine distance is neither. Common staples (salt, water, oil — salt alone is i
 298 of the 790 recipes) are assumed present and excluded from the score, but
 still reported so the composer can list them.
 
+## How safety works
+
+Allergen filtering is a lookup table over canonical ingredient names, not a
+prompt. Three layers, each auditable in `agents/safety.py`:
+
+1. **Marker tokens** — an ingredient belongs to an allergen if one of its whole
+   tokens is a marker. Token equality, not substring, is why *eggplant* is not
+   an egg and *butternut squash* is not butter.
+2. **Generic-marker negation** — `flour`, `noodle`, `butter` and `cream` name a
+   form, not an ingredient, so each is paired with the sources that make it
+   safe. That is one rule covering *rice noodle*, *brown rice noodle* and
+   *cassava flour* alike, rather than an exception list that never keeps up.
+3. **Stated hidden allergens** — standard soy sauce is brewed with wheat,
+   Worcestershire contains anchovy, pesto carries parmesan and pine nuts. No
+   name-based rule can find these, so they are written down.
+
+Substitution is table-first: a static table with exact ratios, preferring
+something the user already has. The LLM is consulted only when the table has
+nothing, and **its suggestion is re-screened by the same allergen check before
+it is returned** — the advisor is never trusted on safety.
+
 ## Setup
 
 Requires Python 3.12.
@@ -163,7 +184,8 @@ tested without network access or API keys.
       normalization, optional LLM segmentation (116 tests)
 - [x] **3. Retrieval agent** — TheMealDB corpus (790 recipes), Chroma
       recall + deterministic overlap ranking (170 tests)
-- [ ] 4. Safety / substitution agent
+- [x] **4. Safety agent** — hard-coded allergen filtering across the big 9,
+      table-first substitution with screened LLM fallback (276 tests)
 - [ ] 5. Nutrition agent
 - [ ] 6. Composer agent
 - [ ] 7. Critic agent + full orchestrator

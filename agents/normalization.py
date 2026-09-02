@@ -73,19 +73,21 @@ INGREDIENT_ALIASES: dict[str, str] = {
     "scallion": "green onion", "spring onion": "green onion",
     "rocket": "arugula",
     "coriander": "cilantro", "dhania": "cilantro",
+    # NB: "coriander seed" is the spice, not the herb, and is left alone by
+    # the KNOWN_INGREDIENTS short-circuit in normalize_name.
     "prawn": "shrimp",
-    "mince": "ground beef", "minced beef": "ground beef",
+    "mince": "ground beef",
     "garbanzo": "chickpea", "garbanzo bean": "chickpea",
     "passata": "tomato puree",
     "double cream": "heavy cream", "thickened cream": "heavy cream",
     "caster sugar": "sugar", "castor sugar": "sugar",
-    "icing sugar": "powdered sugar", "confectioners sugar": "powdered sugar",
+    "icing sugar": "powdered sugar",
+    "confectioner sugar": "powdered sugar",
     "maida": "all-purpose flour", "plain flour": "all-purpose flour",
     "curd": "yogurt", "dahi": "yogurt",
     "ladyfinger": "okra", "bhindi": "okra",
     "spud": "potato", "tater": "potato",
     "soda water": "sparkling water",
-    "stock cube": "bouillon cube",
     "beetroot": "beet",
     "chickpea flour": "besan",
     "corn flour": "cornstarch", "cornflour": "cornstarch",
@@ -108,7 +110,8 @@ PREP_MODIFIERS: frozenset[str] = frozenset({
     "thick", "thin", "long", "square", "round", "whole", "slice", "sliver",
     # "salt to taste" is a quantity hedge, not part of the ingredient's name
     "to", "for", "taste", "needed", "serving", "garnish", "dusting",
-    "drizzling",
+    "drizzling", "extra", "virgin", "unsalted", "salted", "unsweetened",
+    "sweetened", "free", "range", "organic",
     # size words are units positionally; if one reaches the *name* it is noise
     "inch", "cm", "mm", "piece",
 })
@@ -165,7 +168,7 @@ KNOWN_INGREDIENTS: frozenset[str] = frozenset({
     "sunflower seed", "chia seed", "olive oil", "vegetable oil", "sesame oil",
     "coconut oil", "vinegar", "balsamic vinegar", "soy sauce", "fish sauce",
     "hot sauce", "ketchup", "mustard", "mayonnaise", "tomato paste",
-    "tomato puree", "coconut milk", "broth", "bouillon cube", "stock",
+    "tomato puree", "coconut milk", "broth", "bouillon", "stock",
     "peanut butter", "chocolate", "cocoa powder", "wine", "beer",
 })
 
@@ -254,6 +257,11 @@ def normalize_name(raw: str) -> str:
     # "spring onion" and "scallions" land on "green onion".
     if name in INGREDIENT_ALIASES:
         return INGREDIENT_ALIASES[name]
+    # A name already in the canonical vocabulary is never rewritten. Without
+    # this, the word-wise pass below turns "coriander seed" (the spice) into
+    # "cilantro seed" (the herb) via the coriander -> cilantro alias.
+    if name in KNOWN_INGREDIENTS:
+        return name
     return " ".join(INGREDIENT_ALIASES.get(w, w) for w in name.split())
 
 

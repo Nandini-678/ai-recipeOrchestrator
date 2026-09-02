@@ -6,6 +6,8 @@ Pure functions, no network, no API key.
 import pytest
 
 from agents.normalization import (
+    INGREDIENT_ALIASES,
+    KNOWN_INGREDIENTS,
     canonicalize,
     correct_spelling,
     normalize_name,
@@ -132,3 +134,43 @@ class TestCanonicalize:
     def test_combines_normalization_and_spelling_correction(self):
         assert canonicalize("2 finely chopped Brocolli florets") == "broccoli floret"
         assert canonicalize("Scallions") == "green onion"
+
+
+class TestTableConsistency:
+    """The tables feed every other agent, so their invariants are asserted.
+
+    Each of these caught a real bug: "bouillon cube" canonicalized to
+    "bouillon" (so nothing could ever match it), and "coriander seed" was being
+    rewritten to "cilantro seed" by the word-wise alias pass.
+    """
+
+    def test_every_known_ingredient_is_its_own_canonical_form(self):
+        offenders = {
+            n: canonicalize(n) for n in KNOWN_INGREDIENTS if canonicalize(n) != n
+        }
+        assert offenders == {}
+
+    def test_every_alias_actually_reaches_its_target(self):
+        """An alias key that normalizes differently can never fire."""
+        dead = {
+            key: normalize_name(key)
+            for key, value in INGREDIENT_ALIASES.items()
+            if normalize_name(key) != value
+        }
+        assert dead == {}
+
+    def test_every_alias_target_is_canonical(self):
+        offenders = {
+            v: canonicalize(v)
+            for v in INGREDIENT_ALIASES.values()
+            if canonicalize(v) != v
+        }
+        assert offenders == {}
+
+    def test_aliases_do_not_chain(self):
+        """An alias pointing at another alias key would resolve inconsistently."""
+        assert not (set(INGREDIENT_ALIASES.values()) & set(INGREDIENT_ALIASES))
+
+    def test_coriander_seed_is_the_spice_not_the_herb(self):
+        assert canonicalize("coriander") == "cilantro"
+        assert canonicalize("coriander seed") == "coriander seed"
