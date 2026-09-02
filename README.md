@@ -172,6 +172,28 @@ returns *Oil, corn, peanut, and olive* first), so candidates are re-ranked to
 prefer entries that say little beyond the query and that are raw rather than
 prepared.
 
+## What the composer lets the model write
+
+By the time the composer runs, the pipeline already knows the exact quantities,
+the exact have/missing flags and the exact nutrition. Asking a model to restate
+any of that would trade known-correct numbers for plausible ones.
+
+So the model writes **only prose** — title, summary, cooking times, and the
+steps rewritten to reflect substitutions. Everything else is assembled in code:
+
+| Assembled in code | Written by the model |
+|---|---|
+| ingredient list, quantities, units | title, summary |
+| have / missing / assumed-staple flags | numbered steps |
+| substitutions and their scaled amounts | prep and cook time estimates |
+| nutrition per serving | |
+| warnings | |
+
+Responses are validated against a schema that **forbids unexpected fields** and
+rejects empty or malformed steps. On any validation failure — or with no API
+key at all — the agent falls back to the source recipe's own instructions and
+records why. The whole pipeline runs end to end with no credentials.
+
 ## Setup
 
 Requires Python 3.12.
@@ -213,7 +235,8 @@ tested without network access or API keys.
       table-first substitution with screened LLM fallback (276 tests)
 - [x] **5. Nutrition agent** — USDA lookup with re-ranking and caching,
       gram conversion, exact serving-scale math (355 tests)
-- [ ] 6. Composer agent
+- [x] **6. Composer agent** — strict schema validation, code-assembled
+      facts, deterministic fallback (408 tests)
 - [ ] 7. Critic agent + full orchestrator
 - [ ] 8. SQLite memory + Streamlit UI
 

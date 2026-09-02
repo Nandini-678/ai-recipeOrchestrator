@@ -28,6 +28,7 @@ from dataclasses import dataclass
 
 from pydantic import BaseModel, ValidationError, field_validator
 
+from agents.ingredient import Ingredient
 from agents.normalization import canonicalize
 from agents.retrieval import RecipeMatch
 
@@ -408,6 +409,35 @@ class ScreenedMatch:
     def recipe(self):
         """Convenience passthrough to the underlying recipe."""
         return self.match.recipe
+
+
+def apply_substitutions(screened: ScreenedMatch) -> list[Ingredient]:
+    """Return a recipe's ingredients with the planned substitutions applied.
+
+    The nutrition agent must be given *this* list, not the recipe's original
+    one: a recipe whose eggs became flaxseed has different nutrition, and
+    computing it from the pre-substitution ingredients would describe a dish
+    nobody is going to cook.
+
+    Quantities are scaled by each substitution's ratio; ingredients with no
+    quantity stay unquantified.
+    """
+    by_original = {s.original: s for s in screened.substitutions}
+    resolved = []
+    for item in screened.recipe.ingredients:
+        replacement = by_original.get(item.name)
+        if replacement is None:
+            resolved.append(item)
+            continue
+        quantity = (
+            item.quantity * replacement.ratio if item.quantity is not None else None
+        )
+        resolved.append(
+            item.model_copy(
+                update={"name": replacement.replacement, "quantity": quantity}
+            )
+        )
+    return resolved
 
 
 class SafetyAgent:

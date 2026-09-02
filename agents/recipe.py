@@ -23,6 +23,9 @@ _MAX_MEALDB_INGREDIENTS = 20
 
 _SENTENCE_END = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9])")
 _STEP_PREFIX = re.compile(r"^\s*(?:step\s*)?\d+[.)]\s*", flags=re.IGNORECASE)
+#: Some sources put the step number on its own line. A step that is nothing
+#: but a number is numbering, not an instruction.
+_BARE_NUMBER = re.compile(r"^\s*(?:step\s*)?\d+[.)]?\s*$", flags=re.IGNORECASE)
 
 
 class Recipe(BaseModel):
@@ -67,7 +70,10 @@ def split_steps(instructions: str) -> list[str]:
 
     Prefers the source's own line breaks; falls back to sentence boundaries when
     the instructions arrive as one unbroken paragraph. Existing "1." / "Step 2)"
-    prefixes are stripped so the composer can number steps itself.
+    prefixes are stripped so the composer can number steps itself, and lines
+    that are *only* a step number are dropped entirely -- several TheMealDB
+    entries put the number on its own line, which would otherwise double the
+    step count with empty instructions.
     """
     if not instructions or not instructions.strip():
         return []
@@ -79,7 +85,7 @@ def split_steps(instructions: str) -> list[str]:
         steps = [sentence.strip() for sentence in sentences if sentence.strip()]
 
     cleaned = [_STEP_PREFIX.sub("", step).strip() for step in steps]
-    return [step for step in cleaned if step]
+    return [step for step in cleaned if step and not _BARE_NUMBER.match(step)]
 
 
 def _mealdb_ingredients(payload: dict) -> list[Ingredient]:

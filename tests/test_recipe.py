@@ -26,6 +26,16 @@ class TestSplitSteps:
             "Serve.",
         ]
 
+    def test_lines_that_are_only_a_step_number_are_dropped(self):
+        """Several TheMealDB entries put the number on its own line."""
+        blob = "1\r\nFry the garlic.\r\n2\r\nAdd oil.\r\n3\r\n"
+        assert split_steps(blob) == ["Fry the garlic.", "Add oil."]
+
+    def test_a_step_that_merely_starts_with_a_number_is_kept(self):
+        assert split_steps("350 degrees is the target.") == [
+            "350 degrees is the target."
+        ]
+
     @pytest.mark.parametrize("blob", ["", "   ", "\n\n"])
     def test_empty_instructions_give_no_steps(self, blob):
         assert split_steps(blob) == []

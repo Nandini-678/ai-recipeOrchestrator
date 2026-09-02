@@ -19,7 +19,9 @@ from agents.safety import (
     SUBSTITUTIONS,
     GroqSubstitutionAdvisor,
     SafetyAgent,
+    ScreenedMatch,
     Substitution,
+    apply_substitutions,
     detect_allergens,
     normalize_allergens,
     suggest_substitution,
@@ -397,3 +399,72 @@ class TestGroqSubstitutionAdvisor:
         client = _FakeGroqClient('{"replacement": "butter", "ratio": 1}')
         advisor = GroqSubstitutionAdvisor(client=client, model="fake")
         assert advisor("butter", frozenset()) is None
+
+
+class TestApplySubstitutions:
+    """Nutrition must be computed on the list the user will actually cook."""
+
+    def _screened_with(self, ingredients, substitutions=()):
+        recipe = Recipe(
+            id="1", title="T",
+            ingredients=[dict(i) for i in ingredients], steps=["x"],
+        )
+        return ScreenedMatch(
+            match=RecipeMatch(recipe=recipe, score=1.0),
+            violations={},
+            substitutions=tuple(substitutions),
+        )
+
+    def test_replaces_the_name_and_scales_the_quantity(self):
+        screened = self._screened_with(
+            [{"name": "butter", "quantity": 100, "unit": "g"}],
+            [Substitution(original="butter", replacement="olive oil", ratio=0.75)],
+        )
+        resolved = apply_substitutions(screened)
+        assert (resolved[0].name, resolved[0].quantity) == ("olive oil", 75.0)
+        assert resolved[0].unit == "g"
+
+    def test_untouched_ingredients_pass_through(self):
+        screened = self._screened_with([{"name": "rice", "quantity": 2, "unit": "cup"}])
+        resolved = apply_substitutions(screened)
+        assert (resolved[0].name, resolved[0].quantity) == ("rice", 2.0)
+
+    def test_unquantified_ingredients_stay_unquantified(self):
+        screened = self._screened_with(
+            [{"name": "butter"}],
+            [Substitution(original="butter", replacement="olive oil", ratio=0.75)],
+        )
+        assert apply_substitutions(screened)[0].quantity is None
+
+    def test_the_original_recipe_is_not_mutated(self):
+        screened = self._screened_with(
+            [{"name": "butter", "quantity": 100, "unit": "g"}],
+            [Substitution(original="butter", replacement="olive oil", ratio=0.75)],
+        )
+        apply_substitutions(screened)
+        assert screened.recipe.ingredients[0].name == "butter"
+
+    def test_order_is_preserved(self):
+        screened = self._screened_with(
+            [{"name": "rice"}, {"name": "butter"}, {"name": "salt"}],
+            [Substitution(original="butter", replacement="olive oil")],
+        )
+        assert [i.name for i in apply_substitutions(screened)] == [
+            "rice", "olive oil", "salt",
+        ]
+
+    def test_agrees_with_what_the_composer_puts_in_the_ingredient_list(self):
+        """The two paths derive from the same substitution plan and must match."""
+        from agents.composer import ComposerAgent
+        from agents.nutrition import NutritionReport
+
+        screened = self._screened_with(
+            [{"name": "butter", "quantity": 100, "unit": "g"}, {"name": "rice"}],
+            [Substitution(original="butter", replacement="olive oil", ratio=0.75)],
+        )
+        resolved = apply_substitutions(screened)
+        composed = ComposerAgent().compose(screened, NutritionReport(servings=4))
+        assert [i.name for i in resolved] == [i.name for i in composed.ingredients]
+        assert [i.quantity for i in resolved] == [
+            i.quantity for i in composed.ingredients
+        ]
