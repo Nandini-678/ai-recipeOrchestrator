@@ -24,6 +24,7 @@ beats no recipe.
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
@@ -273,7 +274,10 @@ class ComposerAgent:
     # -- the model call ------------------------------------------------------
 
     def _write_prose(
-        self, screened: ScreenedMatch, ingredients: list[ComposedIngredient]
+        self,
+        screened: ScreenedMatch,
+        ingredients: list[ComposedIngredient],
+        feedback: Sequence[str] = (),
     ) -> _ComposerResponse:
         """Ask the model for title, summary, times and steps.
 
@@ -294,6 +298,14 @@ class ComposerAgent:
             f"Ingredients:\n{listing}\n\n"
             f"Original instructions:\n{original}"
         )
+        if feedback:
+            # Retry feedback is specific ("step 3 still says butter"), so it
+            # goes in verbatim rather than as a generic "try again".
+            problems = "\n".join(f"- {item}" for item in feedback)
+            payload += (
+                "\n\nYour previous attempt was rejected for these reasons. "
+                f"Fix each one:\n{problems}"
+            )
 
         try:
             response = self._client.chat.completions.create(
@@ -324,6 +336,7 @@ class ComposerAgent:
         *,
         pantry: set[str] | None = None,
         servings: int | None = None,
+        feedback: Sequence[str] = (),
     ) -> ComposedRecipe:
         """Compose the final recipe.
 
@@ -334,6 +347,9 @@ class ComposerAgent:
                 ``matched`` set.
             servings: Override the serving count the nutrition was computed
                 for. Defaults to the nutrition report's.
+            feedback: Specific problems from a previous attempt, passed to the
+                model verbatim so the retry addresses them rather than
+                re-rolling the dice.
 
         Returns:
             A validated :class:`ComposedRecipe`. ``composed_by`` records
@@ -350,7 +366,9 @@ class ComposerAgent:
 
         if self._client is not None:
             try:
-                written = self._write_prose(screened, assembly.ingredients)
+                written = self._write_prose(
+                    screened, assembly.ingredients, feedback
+                )
             except ComposerError as exc:
                 assembly.warnings.append(f"Used the original instructions ({exc})")
             else:

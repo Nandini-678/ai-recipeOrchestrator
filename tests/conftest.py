@@ -48,11 +48,16 @@ class HashingEmbeddingFunction(EmbeddingFunction):
 
 
 def _recipe(id_: str, title: str, names: list[str], **kwargs) -> Recipe:
-    """Build a Recipe from canonical ingredient names, for brevity in fixtures."""
+    """Build a Recipe from canonical ingredient names, for brevity in fixtures.
+
+    Every ingredient gets a real quantity so the nutrition agent has something
+    to measure; without one it correctly reports the whole recipe as
+    unestimated, which makes pipeline tests assert nothing useful.
+    """
     return Recipe(
         id=id_,
         title=title,
-        ingredients=[{"name": name} for name in names],
+        ingredients=[{"name": name, "quantity": 100.0, "unit": "g"} for name in names],
         steps=["Do the thing.", "Serve."],
         **kwargs,
     )

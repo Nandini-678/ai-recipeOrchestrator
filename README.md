@@ -53,6 +53,10 @@ ingredients (raw text)
 ```
 
 The orchestrator runs these in plain sequential Python — no agent framework.
+Two bounded loops sit inside that straight line: the composer is retried with
+the critic's specific complaints (`max_attempts`), and if a candidate recipe
+cannot be composed acceptably at all, the next-best one is tried
+(`max_candidates`).
 
 Where an agent is marked *optional* for LLM use, the model is an enhancement
 rather than a dependency: the ingredient agent uses an LLM only to segment
@@ -194,6 +198,29 @@ rejects empty or malformed steps. On any validation failure — or with no API
 key at all — the agent falls back to the source recipe's own instructions and
 records why. The whole pipeline runs end to end with no credentials.
 
+## What the critic checks
+
+Every check is mechanical, because the questions have exact answers:
+
+| Check | Severity |
+|---|---|
+| An avoided allergen in the ingredient list **or in a step** | error |
+| A substituted-away ingredient still named in the list or steps | error |
+| Steps introducing an ingredient that is not listed | error if the model wrote them, warning if copied from the source |
+| Structure: no steps, no title, blank steps | error |
+| Have-flags disagreeing with the pantry | warning |
+
+That third row is the one worth explaining. When the model writes the steps, an
+unlisted ingredient is a composition failure and retrying with specific
+feedback fixes it. When the steps come from the dataset verbatim, the
+discrepancy is *in the dataset* — TheMealDB's Ajo blanco genuinely calls for
+bread its ingredient list omits — and retrying would return identical steps
+forever. Across all 790 corpus recipes, this distinction is the difference
+between blocking 42% of them and blocking none.
+
+Findings carry the feedback text the composer receives on retry, so a rejection
+is not "invalid" but *"step 5 still says egg; it was replaced with flaxseed"*.
+
 ## Setup
 
 Requires Python 3.12.
@@ -237,7 +264,8 @@ tested without network access or API keys.
       gram conversion, exact serving-scale math (355 tests)
 - [x] **6. Composer agent** — strict schema validation, code-assembled
       facts, deterministic fallback (408 tests)
-- [ ] 7. Critic agent + full orchestrator
+- [x] **7. Critic agent + orchestrator** — mechanical validation, bounded
+      retry and candidate fallback, sequential pipeline (471 tests)
 - [ ] 8. SQLite memory + Streamlit UI
 
 ## License

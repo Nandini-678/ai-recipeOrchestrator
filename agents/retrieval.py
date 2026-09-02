@@ -98,15 +98,38 @@ def score_overlap(
     )
 
 
-def _rank_key(match: RecipeMatch) -> tuple:
-    """Sort key: coverage, then most ingredients used, then simplest, then title.
+#: Pseudo-count added to the denominator when ranking. It leaves a recipe with
+#: many ingredients essentially unchanged while heavily discounting one with
+#: only a couple, which is what stops a trivially-covered recipe from winning.
+_RANK_SMOOTHING = 1.0
 
-    Coverage alone would let a two-ingredient recipe outrank one that uses far
-    more of the pantry, so absolute matches break the tie. Title last keeps the
-    ordering stable and reproducible in tests.
+
+def adjusted_coverage(match: RecipeMatch) -> float:
+    """Coverage discounted for how little the recipe actually asks for.
+
+    Raw coverage is the honest number to *show* a user -- "you have 4 of these
+    6 ingredients" -- but it is a poor thing to *rank* by, because a recipe
+    made almost entirely of pantry staples has one countable ingredient and
+    scores a perfect 1.0 off a single match. Ranked that way, a flatbread of
+    flour, water, salt and oil beats a chicken dish using five of the six
+    things you actually have.
+
+    Adding one to the denominator fixes the ordering without touching the
+    reported score: 1 of 1 becomes 0.50, while 5 of 6 becomes 0.71.
+    """
+    countable = len(match.matched) + len(match.missing)
+    if not countable:
+        return 0.0
+    return len(match.matched) / (countable + _RANK_SMOOTHING)
+
+
+def _rank_key(match: RecipeMatch) -> tuple:
+    """Sort key: adjusted coverage, then most used, then simplest, then title.
+
+    Title last keeps the ordering stable and reproducible in tests.
     """
     return (
-        -match.score,
+        -adjusted_coverage(match),
         -len(match.matched),
         len(match.recipe.ingredients),
         match.recipe.title,

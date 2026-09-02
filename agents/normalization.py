@@ -23,6 +23,7 @@ UNIT_ALIASES: dict[str, str] = {
     # volume
     "tsp": "tsp", "tsps": "tsp", "teaspoon": "tsp", "teaspoons": "tsp",
     "tbsp": "tbsp", "tbsps": "tbsp", "tbs": "tbsp", "tablespoon": "tbsp",
+    "tblsp": "tbsp", "tblsps": "tbsp", "tspn": "tsp", "tsps.": "tsp",
     "tablespoons": "tbsp",
     "cup": "cup", "cups": "cup", "c": "cup",
     "ml": "ml", "milliliter": "ml", "milliliters": "ml", "millilitre": "ml",
@@ -55,6 +56,7 @@ UNIT_ALIASES: dict[str, str] = {
     "stalk": "stalk", "stalks": "stalk",
     "sprig": "sprig", "sprigs": "sprig",
     "handful": "handful", "handfuls": "handful",
+    "knob": "knob", "knobs": "knob", "splash": "splash", "drizzle": "drizzle",
     "stick": "stick", "sticks": "stick",
     "fillet": "fillet", "fillets": "fillet",
     "package": "packet", "pkg": "packet", "box": "box", "boxes": "box",
@@ -112,6 +114,11 @@ PREP_MODIFIERS: frozenset[str] = frozenset({
     "to", "for", "taste", "needed", "serving", "garnish", "dusting",
     "drizzling", "extra", "virgin", "unsalted", "salted", "unsweetened",
     "sweetened", "free", "range", "organic",
+    # TheMealDB puts the *purpose* in the measure field ("For brushing",
+    # "For frying"), which otherwise prefixes it onto the ingredient name and
+    # splits "olive oil" into three different ingredients.
+    "brushing", "frying", "greasing", "glaze", "glazing", "topping",
+    "sprinkling", "serve", "coating", "dredging", "rolling", "deep",
     # size words are units positionally; if one reaches the *name* it is noise
     "inch", "cm", "mm", "piece",
 })
