@@ -3,12 +3,23 @@
 import hashlib
 
 import pytest
-from chromadb.api.types import Documents, EmbeddingFunction, Embeddings
 
 from agents.recipe import Recipe
 
 
-class HashingEmbeddingFunction(EmbeddingFunction):
+# Chroma powers an optional recall stage, so it is an optional dependency.
+# Importing it here unconditionally would make the entire suite uncollectable
+# without it, which would misrepresent what the app actually requires.
+def _embedding_base():
+    """Return chroma's EmbeddingFunction base, or object if it is absent."""
+    try:
+        from chromadb.api.types import EmbeddingFunction
+    except ImportError:
+        return object
+    return EmbeddingFunction
+
+
+class HashingEmbeddingFunction(_embedding_base()):
     """Deterministic bag-of-words embedder for tests.
 
     Chroma's default embedder downloads a model on first use. This one hashes
@@ -21,7 +32,7 @@ class HashingEmbeddingFunction(EmbeddingFunction):
         """Args: dimensions: Width of the produced vectors."""
         self._dimensions = dimensions
 
-    def __call__(self, input: Documents) -> Embeddings:  # noqa: A002 - chroma API
+    def __call__(self, input) -> list[list[float]]:  # noqa: A002 - chroma API
         """Embed each document as a hashed token-count vector."""
         vectors = []
         for document in input:
@@ -105,4 +116,5 @@ def sample_recipes() -> list[Recipe]:
 @pytest.fixture
 def embedding_function() -> HashingEmbeddingFunction:
     """Offline embedder for building test indexes."""
+    pytest.importorskip("chromadb", reason="optional vector-index dependency")
     return HashingEmbeddingFunction()

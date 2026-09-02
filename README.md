@@ -305,21 +305,28 @@ screens for allergens, composes from the source instructions and validates —
 everything except model-written prose and USDA nutrition. The sidebar says
 which parts are live.
 
-### Deploying
+### Deploying to Streamlit Community Cloud
 
-The code is deployment-ready but nothing is deployed. On Streamlit Community
-Cloud or Hugging Face Spaces, point the app at `ui/app.py` and add the keys as
-secrets:
-
-```toml
-GROQ_API_KEY = "..."
-USDA_API_KEY = "..."
-```
+1. Go to <https://share.streamlit.io> and sign in with GitHub.
+2. **New app** → repository `Nandini-678/ai-recipeOrchestrator`, branch `main`,
+   main file path `ui/app.py`.
+3. **Advanced settings** → Python version **3.12**.
+4. **Secrets** → paste the contents of
+   [`.streamlit/secrets.toml.example`](.streamlit/secrets.toml.example) with
+   your real keys. Both are optional; without them the app runs in degraded
+   mode and says so in the sidebar.
+5. Deploy. The first build takes a few minutes.
 
 `ui/app.py` bridges `st.secrets` into the environment before `config` loads, so
-the same code runs locally from `.env` and hosted from secrets. Set
-`RECIPE_DB_PATH` to a writable volume if you want the store to survive
-restarts.
+the same code runs locally from `.env` and hosted from secrets.
+
+**Two things to expect on the free tier.** Storage is ephemeral, so saved
+recipes and history reset whenever the container restarts — set
+`RECIPE_DB_PATH` to a persistent volume on a host that offers one. And
+`requirements.txt` deliberately omits Chroma: the vector index is never
+imported when serving, and it would add ~175MB to a build that gains nothing
+from it, since scoring all 12,790 recipes takes 40ms. Install
+`requirements-dev.txt` to use it.
 
 ## Running the tests
 

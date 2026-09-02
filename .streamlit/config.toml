@@ -1,0 +1,6 @@
+[server]
+# The corpus is a 13MB JSON file read once at startup; no uploads are accepted.
+maxUploadSize = 5
+
+[browser]
+gatherUsageStats = false

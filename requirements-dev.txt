@@ -1,5 +1,13 @@
-# Development + test tooling. Install with:
+# Tests, linting, dataset builders, and the optional Chroma index.
+# Install alongside the runtime requirements:
 #   pip install -r requirements.txt -r requirements-dev.txt
 
 pytest==9.1.1
 ruff==0.16.5
+
+# Building the RecipeNLG half of the corpus (reads a parquet shard).
+pyarrow==22.0.0
+
+# The optional vector-recall stage in agents/retrieval.py, and the tests that
+# cover it. Not needed to run the app.
+chromadb==1.5.9
