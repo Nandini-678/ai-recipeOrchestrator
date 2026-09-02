@@ -62,7 +62,7 @@ fails. All quantity math and name normalization is deterministic Python.
 | Agent | Responsibility | LLM? |
 |---|---|---|
 | Ingredient | Parse raw text into structured ingredients | optional |
-| Retrieval | Rank local recipes by ingredient overlap | no |
+| Retrieval | Recall via Chroma, rank by ingredient overlap | no |
 | Safety | Allergen filtering + substitution lookup | fallback only |
 | Nutrition | Fetch and scale nutrition facts | no |
 | Composer | Write the final structured recipe | yes |
@@ -89,12 +89,42 @@ All free tier, no paid services.
 ├── orchestrator/   # sequential pipeline wiring the agents together
 ├── ui/             # Streamlit front end
 ├── tests/          # unit tests, one module per agent
+├── scripts/        # one-off dataset builders
 ├── data/
-│   ├── raw/        # recipe dataset as fetched
-│   └── processed/  # normalized dataset + Chroma index (gitignored)
+│   ├── raw/        # cached API responses (gitignored)
+│   └── processed/  # normalized corpus, committed so the repo runs offline
 ├── config.py       # single place environment settings are read
 └── requirements.txt
 ```
+
+## The recipe corpus
+
+790 recipes from TheMealDB ship with the repo at
+`data/processed/recipes.json`, so nothing needs fetching to run the tests or
+the app. To rebuild it:
+
+```bash
+python -m scripts.fetch_recipes            # fetch, cache, normalize
+python -m scripts.fetch_recipes --offline  # re-normalize from the cache
+```
+
+Corpus ingredients are parsed by the *same* pipeline as user input, which is
+what makes overlap matching work: "Plain Flour" in a recipe and "maida" in your
+pantry both canonicalize to `all-purpose flour` before they are ever compared.
+
+## How retrieval ranks
+
+Two stages, deliberately separated:
+
+1. **Recall** — a Chroma vector search narrows the corpus to a candidate pool.
+2. **Ranking** — a pure overlap score orders that pool: what fraction of a
+   recipe's ingredients do you actually have?
+
+No embedding distance reaches the user-visible ranking. "You have 4 of these 6
+ingredients" is a claim the critic agent can verify and the UI can explain; a
+cosine distance is neither. Common staples (salt, water, oil — salt alone is in
+298 of the 790 recipes) are assumed present and excluded from the score, but
+still reported so the composer can list them.
 
 ## Setup
 
@@ -131,7 +161,8 @@ tested without network access or API keys.
 - [x] **1. Repo scaffolding** — structure, venv, requirements, config, README
 - [x] **2. Ingredient agent** — quantity/unit/name parsing, typo + slang
       normalization, optional LLM segmentation (116 tests)
-- [ ] 3. Retrieval agent (RAG)
+- [x] **3. Retrieval agent** — TheMealDB corpus (790 recipes), Chroma
+      recall + deterministic overlap ranking (170 tests)
 - [ ] 4. Safety / substitution agent
 - [ ] 5. Nutrition agent
 - [ ] 6. Composer agent

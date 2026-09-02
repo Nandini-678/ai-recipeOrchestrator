@@ -30,7 +30,10 @@ UNIT_ALIASES: dict[str, str] = {
     "l": "l", "liter": "l", "liters": "l", "litre": "l", "litres": "l",
     "floz": "fl oz", "fl oz": "fl oz", "fluid ounce": "fl oz",
     "fluid ounces": "fl oz",
-    "pint": "pint", "pints": "pint", "quart": "quart", "quarts": "quart",
+    "pint": "pint", "pints": "pint", "pt": "pint", "pts": "pint",
+    "quart": "quart", "quarts": "quart", "qt": "qt", "qts": "qt",
+    "gallon": "gallon", "gallons": "gallon", "gal": "gallon",
+    "cl": "cl", "dl": "dl",
     # weight
     "g": "g", "gram": "g", "grams": "g", "gramme": "g", "grammes": "g",
     "kg": "kg", "kilogram": "kg", "kilograms": "kg", "kilo": "kg",
@@ -54,6 +57,10 @@ UNIT_ALIASES: dict[str, str] = {
     "handful": "handful", "handfuls": "handful",
     "stick": "stick", "sticks": "stick",
     "fillet": "fillet", "fillets": "fillet",
+    "package": "packet", "pkg": "packet", "box": "box", "boxes": "box",
+    "bottle": "bottle", "bottles": "bottle", "bag": "bag", "bags": "bag",
+    # size descriptors that appear where a unit does ("2cm piece ginger")
+    "cm": "cm", "mm": "mm", "inch": "inch", "inches": "inch",
 }
 
 # --- Names -------------------------------------------------------------------
@@ -83,6 +90,8 @@ INGREDIENT_ALIASES: dict[str, str] = {
     "chickpea flour": "besan",
     "corn flour": "cornstarch", "cornflour": "cornstarch",
     "bicarbonate of soda": "baking soda", "bicarb": "baking soda",
+    # hyphens are split before alias lookup, so the spaced form must map too
+    "all purpose flour": "all-purpose flour",
 }
 
 #: Preparation words that describe *handling*, not identity, so they are safe to
@@ -95,6 +104,13 @@ PREP_MODIFIERS: frozenset[str] = frozenset({
     "raw", "cooked", "boneless", "skinless", "finely", "roughly", "thinly",
     "optional", "packed", "softened", "melted", "beaten", "washed", "rinsed",
     "trimmed", "stemmed", "seeded", "pitted", "torn", "cut", "leftover",
+    "into", "cube", "chunk", "strip", "wedge", "batons", "baton", "approx",
+    "thick", "thin", "long", "square", "round", "whole", "slice", "sliver",
+    # "salt to taste" is a quantity hedge, not part of the ingredient's name
+    "to", "for", "taste", "needed", "serving", "garnish", "dusting",
+    "drizzling",
+    # size words are units positionally; if one reaches the *name* it is noise
+    "inch", "cm", "mm", "piece",
 })
 
 #: Words that merely look plural. Stripping the trailing "s" would corrupt them.
@@ -157,6 +173,13 @@ _PUNCTUATION = re.compile(r"[^\w\s/.-]+")
 _WHITESPACE = re.compile(r"\s+")
 _PARENTHETICAL = re.compile(r"\([^)]*\)")
 
+#: A token carrying no name information: bare numbers, fractions, and the
+#: leftovers of compound measures like "1/2-inch".
+_NUMERIC_TOKEN = re.compile(r"^[\d.,/\-\u00bc-\u00be\u2150-\u215e]+$")
+
+#: "juice of 2 lemons" -> "lemon juice"; same for zest, rind, and peel.
+_EXTRACT_OF = re.compile(r"^(juice|zest|rind|peel)\s+of\s+(.+)$")
+
 
 def strip_accents(text: str) -> str:
     """Fold accented characters to ASCII so "jalapeño" matches "jalapeno"."""
@@ -204,16 +227,28 @@ def normalize_name(raw: str) -> str:
     """
     text = strip_accents(raw).lower()
     text = _PARENTHETICAL.sub(" ", text)
+    # Split hyphenated compounds ("1.5cm-thick", "2-inch") so each part can be
+    # judged on its own. Genuinely hyphenated names are restored by the alias
+    # table, which is consulted after this.
+    text = text.replace("-", " ")
     text = _PUNCTUATION.sub(" ", text)
     text = _WHITESPACE.sub(" ", text).strip()
 
-    words = [w for w in text.split() if w and not w.replace(".", "").isdigit()]
+    words = [w for w in text.split() if w and not _NUMERIC_TOKEN.match(w)]
     words = [w for w in words if w not in PREP_MODIFIERS]
     words = [singularize(w) for w in words]
+    # Filter again: the set holds singular forms, so plural prep words
+    # ("cubes", "strips") only become matchable after singularization.
+    words = [w for w in words if w not in PREP_MODIFIERS]
 
     name = " ".join(words).strip()
     if not name:
         return ""
+
+    # "juice of lemon" is the same ingredient as "lemon juice".
+    extracted = _EXTRACT_OF.match(name)
+    if extracted:
+        name = f"{extracted.group(2).strip()} {extracted.group(1)}".strip()
 
     # Aliases are checked on the whole phrase first, then word by word, so both
     # "spring onion" and "scallions" land on "green onion".

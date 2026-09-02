@@ -27,7 +27,7 @@ from collections.abc import Callable, Iterable
 
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
-from agents.normalization import canonicalize, normalize_unit
+from agents.normalization import PREP_MODIFIERS, canonicalize, normalize_unit
 
 #: A callable that splits raw user text into discrete ingredient phrases.
 Extractor = Callable[[str], list[str]]
@@ -90,9 +90,24 @@ VAGUE_QUANTIFIERS: frozenset[str] = frozenset({
 })
 
 _FRACTION = re.compile(r"^(\d+)\s*/\s*(\d+)$")
+#: "2-1/2 cups" is two and a half, not a range from 2 down to 1/2.
+_MIXED_SLASH = re.compile(r"^(\d+)-(\d+)\s*/\s*(\d+)$")
 _MIXED_VULGAR = re.compile(r"^(\d+)([¼-¾⅐-⅞])$")
-_RANGE = re.compile(r"^(\d+(?:\.\d+)?)\s*[-–to]+\s*(\d+(?:\.\d+)?)$")
+#: The upper bound may carry a fraction ("1-1½ cups"); it is
+#: discarded either way, since ranges resolve to their lower bound.
+_RANGE = re.compile(
+    r"^(\d+(?:\.\d+)?)\s*[-–]\s*[\d./¼-¾⅐-⅞]+$"
+)
 _DIGIT_LETTER = re.compile(r"(\d)\s*([a-z])")
+#: "8-ounce", "1/2-inch" -> split so the unit can be read positionally.
+_COMPOUND_MEASURE = re.compile(r"(\d)-([a-z])")
+#: Dual metric/imperial measures ("175g/6oz", "50ml/2fl oz"): the source
+#: gives the same amount twice, so keep the first and drop the alternative.
+_DUAL_MEASURE = re.compile(
+    r"(?<=\d)\s*([a-z]{1,4})\s*/\s*[\d¼-¾⅐-⅞./]+"
+    r"\s*(?:fl\s*oz|floz|fl|oz|lb|g|kg|ml|l)\b",
+    flags=re.IGNORECASE,
+)
 _NUMBER = re.compile(r"^\d+(?:\.\d+)?$")
 
 
@@ -109,6 +124,14 @@ def _vulgar_value(token: str) -> float | None:
 def _token_value(token: str) -> float | None:
     """Numeric value of one quantity token, or ``None`` if it isn't one."""
     if _NUMBER.match(token):
+        return float(token)
+    mixed_slash = _MIXED_SLASH.match(token)
+    if mixed_slash:
+        denominator = int(mixed_slash.group(3))
+        if not denominator:
+            return None
+        whole, numerator = int(mixed_slash.group(1)), int(mixed_slash.group(2))
+        return whole + numerator / denominator
         return float(token)
     fraction = _FRACTION.match(token)
     if fraction:
@@ -150,6 +173,8 @@ def _leading_quantity(tokens: list[str]) -> tuple[float | None, int]:
         consumed = 2 if len(tokens) > 1 and tokens[1] == "of" else 1
         return None, consumed
 
+    if _MIXED_SLASH.match(tokens[0]):
+        return _token_value(tokens[0]), 1
     ranged = _RANGE.match(tokens[0])
     if ranged:
         return float(ranged.group(1)), 1
@@ -191,6 +216,24 @@ def _leading_unit(tokens: list[str]) -> tuple[str | None, int]:
     return None, 0
 
 
+def _skip_modifiers(tokens: list[str]) -> list[str]:
+    """Drop leading preparation words so the unit reader sees the real unit.
+
+    "Small bunch coriander" hides ``bunch`` behind ``small``; without this the
+    unit is never found and "bunch" leaks into the ingredient name.
+    """
+    index = 0
+    while (
+        index < len(tokens) - 1
+        and tokens[index] in PREP_MODIFIERS
+        # Some words are prep noise in a *name* but a real unit in *position*
+        # ("cm", "piece", "slice"). Never skip past one of those.
+        and not normalize_unit(tokens[index])
+    ):
+        index += 1
+    return tokens[index:]
+
+
 def _trailing_unit(tokens: list[str]) -> tuple[str | None, list[str]]:
     """Pull a unit off the *end* of a phrase: "3 garlic cloves".
 
@@ -217,17 +260,40 @@ def parse_phrase(phrase: str) -> Ingredient | None:
     >>> parse_phrase("500g maida")
     Ingredient(name='all-purpose flour', quantity=500.0, unit='g', raw='500g maida')
     """
-    cleaned = _DIGIT_LETTER.sub(r"\1 \2", phrase.strip().lower())
+    cleaned = phrase.strip().lower()
+    cleaned = _DUAL_MEASURE.sub(r"\1", cleaned)
+    cleaned = _COMPOUND_MEASURE.sub(r"\1 \2", cleaned)
+    cleaned = _DIGIT_LETTER.sub(r"\1 \2", cleaned)
     tokens = [t for t in re.split(r"\s+", cleaned) if t]
     if not tokens:
         return None
 
+    tokens = _skip_modifiers(tokens)
     quantity, consumed = _leading_quantity(tokens)
-    tokens = tokens[consumed:]
+    tokens = _skip_modifiers(tokens[consumed:])
+
+    # Pack sizes multiply: "3 400g cans of tomatoes" is 1200g of tomatoes.
+    if quantity is not None:
+        pack_size, pack_consumed = _leading_quantity(tokens)
+        if pack_size is not None and normalize_unit(
+            tokens[pack_consumed] if len(tokens) > pack_consumed else ""
+        ):
+            quantity *= pack_size
+            tokens = tokens[pack_consumed:]
+
     unit, consumed = _leading_unit(tokens)
     tokens = tokens[consumed:]
     if unit is None:
         unit, tokens = _trailing_unit(tokens)
+    else:
+        # Container words stack on a measure, sometimes more than once:
+        # "400g can chickpeas", "2 400g cans can of chickpeas". Keep the
+        # measure and peel off every redundant container behind it.
+        while True:
+            extra, extra_consumed = _leading_unit(tokens)
+            if extra is None or len(tokens) <= extra_consumed:
+                break
+            tokens = tokens[extra_consumed:]
 
     name = canonicalize(" ".join(tokens))
     if not name:

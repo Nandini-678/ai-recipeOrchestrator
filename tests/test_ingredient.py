@@ -100,6 +100,48 @@ class TestParsePhraseMessyNames:
         assert parse_phrase(phrase).name == expected
 
 
+class TestParsePhraseSourceMeasures:
+    """Measure formats that appear in the TheMealDB corpus, not in user input."""
+
+    @pytest.mark.parametrize(
+        ("phrase", "quantity", "unit", "name"),
+        [
+            # dual metric/imperial: same amount twice, keep the metric side
+            ("175g/6oz digestive biscuits", 175.0, "g", "digestive biscuit"),
+            ("50g/1\u00bdoz flaked almonds", 50.0, "g", "flaked almond"),
+            ("50ml/2fl oz double cream", 50.0, "ml", "heavy cream"),
+            # hyphenated compound measures
+            ("8-ounce sliced mushrooms", 8.0, "oz", "mushroom"),
+            # mixed number written with a hyphen
+            ("2-1/2 cups Flour", 2.5, "cup", "flour"),
+            # stacked container words
+            ("400g can Chickpeas", 400.0, "g", "chickpea"),
+            ("2cm piece Ginger", 2.0, "cm", "ginger"),
+            # leading size adjective hiding the unit
+            ("Small bunch Coriander", None, "bunch", "cilantro"),
+        ],
+    )
+    def test_corpus_measure_formats(self, phrase, quantity, unit, name):
+        result = parse_phrase(phrase)
+        assert (result.quantity, result.unit, result.name) == (quantity, unit, name)
+
+    def test_pack_sizes_multiply(self):
+        """"3 400g cans of tomatoes" is 1200g of tomatoes, not 3 of something."""
+        result = parse_phrase("3 400g Cans Chopped Tomatoes")
+        assert (result.quantity, result.unit, result.name) == (1200.0, "g", "tomato")
+
+    def test_juice_of_becomes_the_ingredient_it_names(self):
+        assert parse_phrase("Juice of 1/2 Lemon").name == "lemon juice"
+        assert parse_phrase("zest of 2 limes").name == "lime zest"
+
+    def test_prep_instructions_do_not_leak_into_the_name(self):
+        phrase = "1 chopped into \u00bd-inch pieces Carrots"
+        assert parse_phrase(phrase).name == "carrot"
+
+    def test_a_range_with_a_fractional_upper_bound(self):
+        assert parse_phrase("1-1\u00bd cups sugar").quantity == 1.0
+
+
 class TestSplitPhrases:
     def test_splits_on_commas_and_connectives(self):
         assert split_phrases("2 eggs, milk and butter") == ["2 eggs", "milk", "butter"]
