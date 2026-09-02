@@ -262,10 +262,23 @@ class CriticAgent:
     def _check_substitutions_applied(
         composed: ComposedRecipe, screened: ScreenedMatch
     ) -> list[Finding]:
-        """A replaced ingredient must not survive in the list or the steps."""
+        """A replaced ingredient must not survive in the list or the steps.
+
+        Only checked when the composer actually applied the substitutions. A
+        composer with no model leaves them as suggestions and keeps the
+        original ingredient deliberately, which is consistent rather than
+        wrong -- faulting it would reject every recipe and fix none.
+        """
+        # A substitution was applied only if the replacement is actually in
+        # the ingredient list; a suggestion leaves the original there.
+        applied = {
+            i.substituted_for for i in composed.ingredients if i.substituted_for
+        }
         findings = []
         for substitution in screened.substitutions:
             original = substitution.original
+            if original not in applied:
+                continue
             if any(i.name == original for i in composed.ingredients):
                 findings.append(
                     Finding(

@@ -169,9 +169,14 @@ class RecipeOrchestrator:
         best_nutrition: NutritionReport | None = None
 
         for candidate in screened[: self._max_candidates]:
-            nutrition = self._nutrition.analyze(
-                apply_substitutions(candidate), servings=servings
+            # Nutrition must describe the list the user will actually see,
+            # so it follows the composer's decision about substitutions.
+            ingredients = (
+                apply_substitutions(candidate)
+                if self._composer.applies_substitutions
+                else candidate.recipe.ingredients
             )
+            nutrition = self._nutrition.analyze(ingredients, servings=servings)
             feedback: list[str] = []
 
             for _ in range(self._max_attempts):

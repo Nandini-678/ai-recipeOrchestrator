@@ -68,6 +68,27 @@ class TestParsePhraseQuantities:
         """"2 cloves" is ambiguous, not a nameless quantity."""
         assert parse_phrase("2 cloves") is None
 
+    @pytest.mark.parametrize(
+        ("phrase", "quantity"),
+        [
+            ("maybe 2 onions", 2.0),
+            ("like 3 eggs", 3.0),
+            ("some 500g flour", 500.0),
+            ("maybe a bit of 2 eggs", 2.0),
+        ],
+    )
+    def test_a_hedge_before_a_number_keeps_the_number(self, phrase, quantity):
+        """"maybe 2 onions" is two onions, not an unknown quantity of them."""
+        assert parse_phrase(phrase).quantity == quantity
+
+    @pytest.mark.parametrize(
+        "phrase", ["maybe a bit of cheddar", "like some rice", "just a little salt"]
+    )
+    def test_stacked_hedges_are_all_stripped(self, phrase):
+        result = parse_phrase(phrase)
+        assert result.quantity is None
+        assert result.name in {"cheddar", "rice", "salt"}
+
     def test_no_quantity_at_all(self):
         result = parse_phrase("olive oil")
         assert result.quantity is None and result.unit is None
@@ -149,6 +170,18 @@ class TestSplitPhrases:
     def test_strips_conversational_lead_in(self):
         assert split_phrases("I've got chicken, rice") == ["chicken", "rice"]
         assert split_phrases("there's some tofu") == ["some tofu"]
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "uhh I think I have rice",
+            "um, so I've got rice",
+            "well, there's rice",
+            "okay so I have rice",
+        ],
+    )
+    def test_conversational_filler_is_stripped_repeatedly(self, text):
+        assert split_phrases(text) == ["rice"]
 
     def test_handles_bulleted_lists(self):
         assert split_phrases("• 2 eggs\n• 1 cup rice") == ["2 eggs", "1 cup rice"]

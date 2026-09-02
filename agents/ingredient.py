@@ -87,6 +87,7 @@ VAGUE_PHRASES: frozenset[str] = frozenset({
 VAGUE_QUANTIFIERS: frozenset[str] = frozenset({
     "some", "several", "plenty", "lots", "loads", "any", "bit", "little",
     "leftover", "spare", "maybe", "like", "about", "around", "roughly",
+    "just", "only", "still",
 })
 
 _FRACTION = re.compile(r"^(\d+)\s*/\s*(\d+)$")
@@ -147,6 +148,27 @@ def _token_value(token: str) -> float | None:
     return WORD_NUMBERS.get(token)
 
 
+def _strip_hedges(tokens: list[str]) -> tuple[list[str], int, bool]:
+    """Remove stacked vagueness from the front: "maybe a bit of", "like some".
+
+    Returns:
+        The remaining tokens, how many were consumed, and whether any hedge was
+        actually seen. The flag matters: a hedge means the user did not measure,
+        but only if no real number follows it.
+    """
+    consumed = 0
+    hedged = False
+    while tokens:
+        if len(tokens) >= 2 and f"{tokens[0]} {tokens[1]}" in VAGUE_PHRASES:
+            step = 3 if len(tokens) > 2 and tokens[2] == "of" else 2
+        elif tokens[0] in VAGUE_QUANTIFIERS:
+            step = 2 if len(tokens) > 1 and tokens[1] == "of" else 1
+        else:
+            break
+        tokens, consumed, hedged = tokens[step:], consumed + step, True
+    return tokens, consumed, hedged
+
+
 def _leading_quantity(tokens: list[str]) -> tuple[float | None, int]:
     """Read a quantity off the front of ``tokens``.
 
@@ -154,50 +176,54 @@ def _leading_quantity(tokens: list[str]) -> tuple[float | None, int]:
         ``(quantity, consumed)`` -- the value (``None`` if the user was vague or
         gave no number) and how many tokens to drop before reading the unit.
 
+    Hedges are stripped first and a real number is still read from behind them:
+    "maybe 2 onions" is two onions, not an unknown quantity of them. Only a
+    hedge with no number behind it yields ``None``.
+
     Ranges resolve to their **lower** bound: "2-3 cloves" means you can count on
     two, and over-promising an inventory is the more damaging error here.
     """
     if not tokens:
         return None, 0
 
+    tokens, hedge_consumed, hedged = _strip_hedges(tokens)
+    if not tokens:
+        return None, hedge_consumed
+
+    def result(value: float | None, used: int) -> tuple[float | None, int]:
+        return value, hedge_consumed + used
+
     if len(tokens) >= 2:
         phrase = f"{tokens[0]} {tokens[1]}"
-        if phrase in VAGUE_PHRASES:
-            consumed = 3 if len(tokens) > 2 and tokens[2] == "of" else 2
-            return None, consumed
         if phrase in PHRASE_NUMBERS:
-            consumed = 3 if len(tokens) > 2 and tokens[2] == "of" else 2
-            return PHRASE_NUMBERS[phrase], consumed
-
-    if tokens[0] in VAGUE_QUANTIFIERS:
-        consumed = 2 if len(tokens) > 1 and tokens[1] == "of" else 1
-        return None, consumed
+            used = 3 if len(tokens) > 2 and tokens[2] == "of" else 2
+            return result(PHRASE_NUMBERS[phrase], used)
 
     if _MIXED_SLASH.match(tokens[0]):
-        return _token_value(tokens[0]), 1
+        return result(_token_value(tokens[0]), 1)
     ranged = _RANGE.match(tokens[0])
     if ranged:
-        return float(ranged.group(1)), 1
+        return result(float(ranged.group(1)), 1)
     if (
         len(tokens) >= 3
         and tokens[1] == "to"
         and _NUMBER.match(tokens[0])
         and _NUMBER.match(tokens[2])
     ):
-        return float(tokens[0]), 3
+        return result(float(tokens[0]), 3)
 
     first = _token_value(tokens[0])
     if first is None:
-        return None, 0
+        return None, hedge_consumed
 
     # Mixed numbers: "1 1/2 cups" -> 1.5
     if len(tokens) >= 2 and float(first).is_integer():
         second = _token_value(tokens[1])
         if second is not None and 0 < second < 1:
-            return first + second, 2
+            return result(first + second, 2)
 
-    consumed = 2 if len(tokens) > 1 and tokens[1] == "of" else 1
-    return first, consumed
+    used = 2 if len(tokens) > 1 and tokens[1] == "of" else 1
+    return result(first, used)
 
 
 def _leading_unit(tokens: list[str]) -> tuple[str | None, int]:
@@ -306,9 +332,13 @@ def parse_phrase(phrase: str) -> Ingredient | None:
 _SEPARATORS = re.compile(
     r"[,;\n•]|\band\b|\bplus\b|\balso\b|\bwith\b", flags=re.IGNORECASE
 )
+#: Conversational filler before the list proper. Applied repeatedly, so
+#: "uhh, I think I've got ..." is stripped a piece at a time.
 _LEAD_IN = re.compile(
-    r"^\s*(?:i(?:'ve| have)?\s+(?:got|have)|there(?:'s| is)|we(?:'ve| have)"
-    r"|my fridge has|in the fridge|got)\b[:,]?\s*",
+    r"^\s*(?:uh+|um+|er+|so|ok(?:ay)?|well|hmm+|right|let'?s see"
+    r"|i\s+(?:think|guess|reckon|suppose)|i(?:'ve| have)?\s+(?:got|have)"
+    r"|there(?:'s| is)|we(?:'ve| have)|my fridge has|in the fridge|got"
+    r"|maybe|like|just)\b[:,]?\s*",
     flags=re.IGNORECASE,
 )
 
@@ -319,7 +349,12 @@ def split_phrases(text: str) -> list[str]:
     Strips a conversational lead-in ("I've got ...") then splits on commas,
     newlines, bullets, and connective words.
     """
-    without_lead_in = _LEAD_IN.sub("", text.strip())
+    without_lead_in = text.strip()
+    while True:
+        trimmed = _LEAD_IN.sub("", without_lead_in, count=1)
+        if trimmed == without_lead_in:
+            break
+        without_lead_in = trimmed
     parts = _SEPARATORS.split(without_lead_in)
     return [part.strip(" .\t") for part in parts if part and part.strip(" .\t")]
 

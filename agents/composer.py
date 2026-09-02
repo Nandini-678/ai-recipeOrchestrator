@@ -202,14 +202,26 @@ class ComposerAgent:
 
     # -- factual assembly, no model involved ---------------------------------
 
-    @staticmethod
+    @property
+    def applies_substitutions(self) -> bool:
+        """Whether this composer can actually act on a substitution.
+
+        Replacing an ingredient means nothing unless the instructions change to
+        match: a list that says flaxseed above steps that say egg contradicts
+        itself. Only a composer that rewrites the prose can apply one, so
+        without a model the substitutions become suggestions instead.
+        """
+        return self._client is not None
+
     def _assemble(
-        screened: ScreenedMatch, nutrition: NutritionReport, pantry: set[str]
+        self, screened: ScreenedMatch, nutrition: NutritionReport, pantry: set[str]
     ) -> _Assembly:
         """Build the ingredient list, substitutions and warnings from the facts."""
-        by_original: dict[str, Substitution] = {
-            s.original: s for s in screened.substitutions
-        }
+        by_original: dict[str, Substitution] = (
+            {s.original: s for s in screened.substitutions}
+            if self.applies_substitutions
+            else {}
+        )
         staples = set(screened.match.staples_assumed)
 
         ingredients: list[ComposedIngredient] = []
@@ -226,7 +238,7 @@ class ComposerAgent:
                 composed = ComposedIngredient(
                     name=replacement.replacement,
                     quantity=quantity,
-                    unit=item.unit,
+                    unit=replacement.unit or item.unit,
                     have=replacement.in_pantry,
                     substituted_for=item.name,
                     note=replacement.note,
@@ -243,6 +255,23 @@ class ComposerAgent:
             ingredients.append(composed)
 
         warnings: list[str] = []
+        if screened.substitutions and not self.applies_substitutions:
+            suggestions = ", ".join(
+                f"{s.original} -> {s.replacement}" for s in screened.substitutions
+            )
+            substitutions = [
+                ComposedIngredient(
+                    name=s.replacement,
+                    have=s.in_pantry,
+                    substituted_for=s.original,
+                    note=s.note,
+                )
+                for s in screened.substitutions
+            ]
+            warnings.append(
+                "Suggested substitutions, not applied to the steps below: "
+                + suggestions
+            )
         if screened.unresolved:
             warnings.append(
                 "No substitute found for: " + ", ".join(screened.unresolved)

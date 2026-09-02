@@ -235,6 +235,10 @@ class Substitution:
         original: The ingredient being replaced.
         replacement: What to use instead, as a canonical name.
         ratio: Multiply the original quantity by this to get the replacement's.
+        unit: Canonical unit the replacement is measured in, when it differs
+            from the original's. Four eggs become four *tablespoons* of ground
+            flaxseed, not four flaxseeds; without this the quantity is
+            nonsense and the nutrition agent cannot weigh it.
         note: Short human-readable caveat, shown in the final recipe.
         source: ``"table"`` for a curated entry, ``"llm"`` for a model
             suggestion that passed the allergen screen.
@@ -244,70 +248,122 @@ class Substitution:
     original: str
     replacement: str
     ratio: float = 1.0
+    unit: str | None = None
     note: str = ""
     source: str = "table"
     in_pantry: bool = False
 
 
-#: Curated substitutions, best candidate first. Deliberately small: these are
-#: the cases worth being exact about, and everything else falls through to the
-#: advisor. Ratios are by volume unless the note says otherwise.
-SUBSTITUTIONS: dict[str, tuple[tuple[str, float, str], ...]] = {
+#: Curated substitutions, best candidate first, as
+#: ``(replacement, ratio, unit, note)``. A unit of ``None`` keeps the
+#: original's. Ratios are by volume unless the note says otherwise.
+SUBSTITUTIONS: dict[str, tuple[tuple[str, float, str | None, str], ...]] = {
     "butter": (
-        ("olive oil", 0.75, "use three quarters as much"),
-        ("coconut oil", 1.0, "adds a faint coconut note"),
+        ("olive oil", 0.75, None, "use three quarters as much"),
+        ("coconut oil", 1.0, None, "adds a faint coconut note"),
     ),
     "milk": (
-        ("oat milk", 1.0, ""),
-        ("almond milk", 1.0, ""),
-        ("soy milk", 1.0, ""),
-        ("coconut milk", 1.0, "richer, slightly sweet"),
+        ("oat milk", 1.0, None, ""),
+        ("almond milk", 1.0, None, ""),
+        ("soy milk", 1.0, None, ""),
+        ("coconut milk", 1.0, None, "richer, slightly sweet"),
     ),
     "heavy cream": (
-        ("coconut cream", 1.0, "dairy free"),
-        ("evaporated milk", 1.0, "less rich"),
+        ("coconut cream", 1.0, None, "dairy free"),
+        ("evaporated milk", 1.0, None, "less rich"),
     ),
-    "sour cream": (("yogurt", 1.0, "thicker if strained"),),
-    "yogurt": (("sour cream", 1.0, ""), ("coconut yogurt", 1.0, "dairy free")),
-    "buttermilk": (("milk", 1.0, "add 1 tbsp lemon juice per cup, rest 5 min"),),
+    "sour cream": (("yogurt", 1.0, None, "thicker if strained"),),
+    "yogurt": (
+        ("sour cream", 1.0, None, ""),
+        ("coconut yogurt", 1.0, None, "dairy free"),
+    ),
+    "buttermilk": (("milk", 1.0, None, "add 1 tbsp lemon juice per cup, rest 5 min"),),
     "parmesan cheese": (
-        ("pecorino", 1.0, "sharper"),
-        ("nutritional yeast", 0.5, "vegan, use half as much"),
+        ("pecorino", 1.0, None, "sharper"),
+        ("nutritional yeast", 0.5, None, "vegan, use half as much"),
     ),
     "egg": (
-        ("flaxseed", 1.0, "1 tbsp ground flaxseed + 3 tbsp water per egg"),
-        ("applesauce", 1.0, "60ml per egg; baking only"),
-        ("banana", 1.0, "half a mashed banana per egg; baking only"),
+        ("flaxseed", 1.0, "tbsp", "1 tbsp ground flaxseed + 3 tbsp water per egg"),
+        ("applesauce", 60.0, "ml", "60ml per egg; baking only"),
+        ("banana", 0.5, None, "half a mashed banana per egg; baking only"),
     ),
     "all-purpose flour": (
-        ("oat flour", 1.0, "gluten free; slightly denser"),
-        ("rice flour", 1.0, "gluten free"),
-        ("almond flour", 1.0, "gluten free; do not use for bread"),
+        ("oat flour", 1.0, None, "gluten free; slightly denser"),
+        ("rice flour", 1.0, None, "gluten free"),
+        ("almond flour", 1.0, None, "gluten free; do not use for bread"),
     ),
-    "breadcrumb": (("oat", 1.0, "pulse first"), ("almond flour", 1.0, "gluten free")),
-    "pasta": (("rice noodle", 1.0, "gluten free"),),
+    "breadcrumb": (
+        ("oat", 1.0, None, "pulse first"),
+        ("almond flour", 1.0, None, "gluten free"),
+    ),
+    "pasta": (("rice noodle", 1.0, None, "gluten free"),),
     "soy sauce": (
-        ("tamari", 1.0, "gluten free"),
-        ("coconut amino", 1.0, "soy free, milder and sweeter"),
+        ("tamari", 1.0, None, "gluten free"),
+        ("coconut amino", 1.0, None, "soy free, milder and sweeter"),
     ),
     "peanut butter": (
-        ("sunflower seed butter", 1.0, "nut free"),
-        ("almond butter", 1.0, "still a tree nut"),
+        ("sunflower seed butter", 1.0, None, "nut free"),
+        ("almond butter", 1.0, None, "still a tree nut"),
     ),
-    "honey": (("maple syrup", 1.0, "vegan"), ("sugar", 0.75, "add a splash of water")),
-    "sugar": (("honey", 0.75, ""), ("maple syrup", 0.75, "")),
-    "lemon juice": (("lime juice", 1.0, ""), ("vinegar", 0.5, "sharper")),
-    "cilantro": (("parsley", 1.0, "milder, no citrus note"),),
-    "shallot": (("onion", 0.5, "use half; stronger"),),
-    "green onion": (("chive", 1.0, ""), ("onion", 0.5, "cook it first")),
-    "cornstarch": (("all-purpose flour", 2.0, "use twice as much"),),
-    "wine": (("broth", 1.0, "add 1 tsp vinegar for acidity"),),
-    "broth": (("bouillon", 1.0, "dissolve one cube in the same volume of water"),),
-    "shrimp": (("chicken breast", 1.0, ""), ("tofu", 1.0, "vegetarian")),
-    "rice": (("quinoa", 1.0, ""), ("couscous", 1.0, "contains wheat")),
-    "vegetable oil": (("olive oil", 1.0, ""), ("coconut oil", 1.0, "")),
-    "ginger": (("ginger paste", 1.0, "1 tsp paste per 1 tsp fresh"),),
+    "honey": (
+        ("maple syrup", 1.0, None, "vegan"),
+        ("sugar", 0.75, None, "add a splash of water"),
+    ),
+    "sugar": (("honey", 0.75, None, ""), ("maple syrup", 0.75, None, "")),
+    "lemon juice": (("lime juice", 1.0, None, ""), ("vinegar", 0.5, None, "sharper")),
+    "cilantro": (("parsley", 1.0, None, "milder, no citrus note"),),
+    "shallot": (("onion", 0.5, None, "use half; stronger"),),
+    "green onion": (("chive", 1.0, None, ""), ("onion", 0.5, None, "cook it first")),
+    "cornstarch": (("all-purpose flour", 2.0, None, "use twice as much"),),
+    "wine": (("broth", 1.0, None, "add 1 tsp vinegar for acidity"),),
+    "broth": (
+        ("bouillon", 1.0, None, "dissolve one cube in the same volume of water"),
+    ),
+    "shrimp": (("chicken breast", 1.0, None, ""), ("tofu", 1.0, None, "vegetarian")),
+    "rice": (("quinoa", 1.0, None, ""), ("couscous", 1.0, None, "contains wheat")),
+    "vegetable oil": (("olive oil", 1.0, None, ""), ("coconut oil", 1.0, None, "")),
+    "ginger": (("ginger paste", 1.0, None, "1 tsp paste per 1 tsp fresh"),),
+    "ginger paste": (("ginger", 1.0, None, "1 tsp fresh grated per 1 tsp paste"),),
+    # Coverage for what real pantries most often lack, added after watching
+    # the advisor propose dairy milk for coconut milk. A curated answer that
+    # keeps the dish intact beats a plausible one that changes it.
+    "coconut milk": (
+        ("coconut cream", 0.75, None, "thin with water to taste"),
+        ("heavy cream", 1.0, None, "loses the coconut note; not dairy free"),
+    ),
+    "bay leaf": (("thyme", 0.5, None, "different but works in a braise"),),
+    "turmeric": (("curry powder", 1.0, None, "already contains turmeric"),),
+    "paprika": (("chili powder", 0.5, None, "hotter; use less"),),
+    "sea salt": (("salt", 1.0, None, ""),),
+    "kosher salt": (("salt", 0.75, None, "finer grain, so use less"),),
+    "vegetable stock": (
+        ("broth", 1.0, None, ""),
+        ("bouillon", 1.0, None, "dissolve in water"),
+    ),
+    "beef stock": (
+        ("broth", 1.0, None, ""),
+        ("bouillon", 1.0, None, "dissolve in water"),
+    ),
+    "chicken stock": (
+        ("broth", 1.0, None, ""),
+        ("bouillon", 1.0, None, "dissolve in water"),
+    ),
+    "baguette": (("bread", 1.0, None, ""),),
+    "sunflower oil": (("vegetable oil", 1.0, None, ""), ("olive oil", 1.0, None, "")),
+    "basil leaf": (("basil", 1.0, None, ""), ("parsley", 1.0, None, "milder")),
+    "tomato puree": (("tomato paste", 0.5, None, "thicker; dilute with water"),),
+    "lime": (("lemon", 1.0, None, "sharper, less floral"),),
+    "red chili": (("chili powder", 0.25, None, "use a quarter as much"),),
+    "sesame seed": (("sunflower seed", 1.0, None, "less aromatic"),),
+    "red pepper": (("bell pepper", 1.0, None, ""),),
+    "cabbage": (("lettuce", 1.0, None, "raw only; will not hold up to cooking"),),
+    "bread": (("bread roll", 1.0, None, ""),),
 }
+
+#: Substituting a handful of things is help; substituting most of the list
+#: quietly turns the recipe into a different dish. Past this count the
+#: remaining gaps are reported as unresolved so the user can decide.
+MAX_SUBSTITUTIONS_PER_RECIPE = 3
 
 
 class SubstitutionAdvisor:
@@ -350,11 +406,12 @@ def suggest_substitution(
             original=missing,
             replacement=replacement,
             ratio=ratio,
+            unit=unit,
             note=note,
             source="table",
             in_pantry=replacement in have,
         )
-        for replacement, ratio, note in SUBSTITUTIONS.get(missing, ())
+        for replacement, ratio, unit, note in SUBSTITUTIONS.get(missing, ())
         if not (detect_allergens(replacement) & allergens)
     ]
     if safe:
@@ -374,6 +431,7 @@ def suggest_substitution(
         original=missing,
         replacement=suggestion.replacement,
         ratio=suggestion.ratio,
+        unit=suggestion.unit,
         note=suggestion.note,
         source="llm",
         in_pantry=suggestion.replacement in have,
@@ -434,7 +492,11 @@ def apply_substitutions(screened: ScreenedMatch) -> list[Ingredient]:
         )
         resolved.append(
             item.model_copy(
-                update={"name": replacement.replacement, "quantity": quantity}
+                update={
+                    "name": replacement.replacement,
+                    "quantity": quantity,
+                    "unit": replacement.unit or item.unit,
+                }
             )
         )
     return resolved
@@ -443,9 +505,20 @@ def apply_substitutions(screened: ScreenedMatch) -> list[Ingredient]:
 class SafetyAgent:
     """Screens retrieval matches for allergens and plans substitutions."""
 
-    def __init__(self, advisor: SubstitutionAdvisor | None = None) -> None:
-        """Args: advisor: Optional LLM fallback for uncovered substitutions."""
+    def __init__(
+        self,
+        advisor: SubstitutionAdvisor | None = None,
+        max_substitutions: int = MAX_SUBSTITUTIONS_PER_RECIPE,
+    ) -> None:
+        """Build the agent.
+
+        Args:
+            advisor: Optional LLM fallback for uncovered substitutions.
+            max_substitutions: Most replacements to apply to one recipe;
+                beyond this, gaps are reported as unresolved.
+        """
         self._advisor = advisor
+        self._max_substitutions = max_substitutions
 
     def find_violations(
         self, recipe, avoid: frozenset[str]
@@ -491,6 +564,11 @@ class SafetyAgent:
 
             substitutions, unresolved = [], []
             for missing in match.missing:
+                if len(substitutions) >= self._max_substitutions:
+                    # Enough already changed; report the rest honestly rather
+                    # than rewriting the dish out from under the user.
+                    unresolved.append(missing)
+                    continue
                 found = suggest_substitution(
                     missing, pantry=have, avoid=allergens, advisor=self._advisor
                 )

@@ -162,14 +162,31 @@ class TestInventedIngredientCheck:
 
 class TestSubstitutionChecks:
     def test_a_replaced_ingredient_left_in_the_list_is_an_error(self):
+        """The replacement is in the list, but so is the thing it replaced."""
         screened = _screened(
             ["butter"],
             [Substitution(original="butter", replacement="olive oil", ratio=0.75)],
         )
-        verdict = CriticAgent().review(
-            _composed(["butter"], ("Melt the butter.",)), screened=screened
+        composed = _composed(
+            [
+                ComposedIngredient(name="olive oil", substituted_for="butter"),
+                ComposedIngredient(name="butter"),
+            ],
+            ("Heat the olive oil.",),
         )
+        verdict = CriticAgent().review(composed, screened=screened)
         assert any(f.code == "substitution_not_applied" for f in verdict.errors)
+
+    def test_a_substitution_offered_only_as_a_suggestion_is_not_faulted(self):
+        """A composer with no model keeps the original on purpose."""
+        screened = _screened(
+            ["butter"],
+            [Substitution(original="butter", replacement="olive oil", ratio=0.75)],
+        )
+        composed = _composed(
+            ["butter"], ("Melt the butter.",), composed_by="fallback"
+        )
+        assert CriticAgent().review(composed, screened=screened).ok
 
     def test_a_replaced_ingredient_still_named_in_a_step_is_an_error(self):
         screened = _screened(

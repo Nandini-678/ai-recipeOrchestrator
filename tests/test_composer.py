@@ -141,6 +141,7 @@ class TestFactualAssembly:
         assert salt.assumed_staple is True
 
     def test_substitutions_replace_the_ingredient_and_scale_the_quantity(self):
+        """Only a composer that can rewrite the steps applies a substitution."""
         screened = _screened(
             [{"name": "butter", "quantity": 100, "unit": "g"}],
             substitutions=(
@@ -150,7 +151,8 @@ class TestFactualAssembly:
                 ),
             ),
         )
-        composed = ComposerAgent().compose(screened, _report(), pantry=set())
+        agent = ComposerAgent(client=_FakeGroqClient(GOOD), model="fake")
+        composed = agent.compose(screened, _report(), pantry=set())
         line = composed.ingredients[0]
         assert line.name == "olive oil"
         assert line.quantity == 75.0
@@ -165,8 +167,29 @@ class TestFactualAssembly:
                 Substitution(original="butter", replacement="olive oil", ratio=0.75),
             ),
         )
-        composed = ComposerAgent().compose(screened, _report(), pantry=set())
+        agent = ComposerAgent(client=_FakeGroqClient(GOOD), model="fake")
+        composed = agent.compose(screened, _report(), pantry=set())
         assert [s.substituted_for for s in composed.substitutions] == ["butter"]
+
+    def test_without_a_model_a_substitution_becomes_a_suggestion(self):
+        """Swapping the list while the steps still say butter contradicts itself."""
+        screened = _screened(
+            [{"name": "butter", "quantity": 100, "unit": "g"}],
+            steps=("Melt the butter.",),
+            substitutions=(
+                Substitution(original="butter", replacement="olive oil", ratio=0.75),
+            ),
+        )
+        composed = ComposerAgent().compose(screened, _report(), pantry=set())
+        assert composed.ingredients[0].name == "butter"
+        assert composed.ingredients[0].quantity == 100.0
+        assert [s.substituted_for for s in composed.substitutions] == ["butter"]
+        assert any("not applied" in w for w in composed.warnings)
+
+    def test_applies_substitutions_reflects_whether_a_model_is_configured(self):
+        assert ComposerAgent().applies_substitutions is False
+        agent = ComposerAgent(client=_FakeGroqClient(GOOD), model="fake")
+        assert agent.applies_substitutions is True
 
     def test_a_substitution_with_no_quantity_stays_unquantified(self):
         screened = _screened(
@@ -175,7 +198,8 @@ class TestFactualAssembly:
                 Substitution(original="butter", replacement="olive oil", ratio=0.75),
             ),
         )
-        composed = ComposerAgent().compose(screened, _report(), pantry=set())
+        agent = ComposerAgent(client=_FakeGroqClient(GOOD), model="fake")
+        composed = agent.compose(screened, _report(), pantry=set())
         assert composed.ingredients[0].quantity is None
 
     def test_ingredient_order_follows_the_source_recipe(self):

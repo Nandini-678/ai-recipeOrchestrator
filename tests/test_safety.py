@@ -16,6 +16,7 @@ from agents.safety import (
     ALLERGEN_MARKERS,
     ALLERGEN_SAFE,
     KNOWN_ALLERGENS,
+    MAX_SUBSTITUTIONS_PER_RECIPE,
     SUBSTITUTIONS,
     GroqSubstitutionAdvisor,
     SafetyAgent,
@@ -155,16 +156,31 @@ class TestTableIntegrity:
         """A non-canonical name would never match a pantry or an allergen rule."""
         for original, candidates in SUBSTITUTIONS.items():
             assert canonicalize(original) == original, original
-            for replacement, _, _ in candidates:
+            for replacement, _, _, _ in candidates:
                 assert canonicalize(replacement) == replacement, replacement
 
     def test_no_substitution_replaces_an_ingredient_with_itself(self):
         for original, candidates in SUBSTITUTIONS.items():
-            assert all(r != original for r, _, _ in candidates), original
+            assert all(r != original for r, _, _, _ in candidates), original
 
     def test_substitution_ratios_are_positive(self):
         for candidates in SUBSTITUTIONS.values():
-            assert all(ratio > 0 for _, ratio, _ in candidates)
+            assert all(ratio > 0 for _, ratio, _, _ in candidates)
+
+    def test_substitution_units_are_canonical(self):
+        """A unit the converter does not know makes the quantity unweighable."""
+        from agents.normalization import normalize_unit
+
+        for candidates in SUBSTITUTIONS.values():
+            for _, _, unit, _ in candidates:
+                assert unit is None or normalize_unit(unit) == unit, unit
+
+    def test_a_count_substitution_that_changes_units_says_so(self):
+        """Four eggs become four tablespoons of flaxseed, not four flaxseeds."""
+        flaxseed = next(
+            c for c in SUBSTITUTIONS["egg"] if c[0] == "flaxseed"
+        )
+        assert flaxseed[2] == "tbsp"
 
     def test_marker_sets_do_not_silently_overlap_across_allergens(self):
         """Shared markers are legitimate but must be intentional, not typos."""
@@ -458,13 +474,56 @@ class TestApplySubstitutions:
         from agents.composer import ComposerAgent
         from agents.nutrition import NutritionReport
 
+        class _ApplyingComposer(ComposerAgent):
+            """A composer that applies substitutions without needing a model."""
+
+            @property
+            def applies_substitutions(self):
+                return True
+
         screened = self._screened_with(
             [{"name": "butter", "quantity": 100, "unit": "g"}, {"name": "rice"}],
             [Substitution(original="butter", replacement="olive oil", ratio=0.75)],
         )
         resolved = apply_substitutions(screened)
-        composed = ComposerAgent().compose(screened, NutritionReport(servings=4))
+        # apply_substitutions models what an applying composer produces, so
+        # compare against one that can actually apply them.
+        composed = _ApplyingComposer().compose(screened, NutritionReport(servings=4))
         assert [i.name for i in resolved] == [i.name for i in composed.ingredients]
         assert [i.quantity for i in resolved] == [
             i.quantity for i in composed.ingredients
         ]
+
+
+class TestSubstitutionCap:
+    """Replacing most of a list quietly turns it into a different dish."""
+
+    def _match_missing(self, missing):
+        recipe = Recipe(
+            id="1", title="T",
+            ingredients=[{"name": n} for n in missing], steps=["x"],
+        )
+        return RecipeMatch(recipe=recipe, score=0.0, missing=tuple(missing))
+
+    def test_no_more_than_the_cap_is_substituted(self):
+        missing = ["butter", "milk", "honey", "sugar", "rice", "cilantro"]
+        screened = SafetyAgent().screen([self._match_missing(missing)])[0]
+        assert len(screened.substitutions) == MAX_SUBSTITUTIONS_PER_RECIPE
+
+    def test_the_rest_are_reported_unresolved_not_dropped(self):
+        missing = ["butter", "milk", "honey", "sugar", "rice", "cilantro"]
+        screened = SafetyAgent().screen([self._match_missing(missing)])[0]
+        assert len(screened.substitutions) + len(screened.unresolved) == len(missing)
+
+    def test_the_cap_is_configurable(self):
+        missing = ["butter", "milk", "honey"]
+        screened = SafetyAgent(max_substitutions=1).screen(
+            [self._match_missing(missing)]
+        )[0]
+        assert len(screened.substitutions) == 1
+
+    def test_coconut_milk_has_a_curated_answer(self):
+        """The advisor proposed dairy milk for it; the table does better."""
+        from agents.safety import suggest_substitution
+
+        assert suggest_substitution("coconut milk").replacement == "coconut cream"
