@@ -28,8 +28,21 @@ from agents.recipe import Recipe
 #: the score but still reported, so the composer can list them.
 PANTRY_STAPLES: frozenset[str] = frozenset({
     "salt", "black pepper", "pepper", "water", "olive oil", "vegetable oil",
-    "sugar", "flour", "all-purpose flour", "butter", "oil",
+    "sugar", "flour", "all-purpose flour", "butter", "oil", "cooking oil",
 })
+
+
+def is_staple(name: str) -> bool:
+    """Whether an ingredient can be assumed present.
+
+    Handles the compound form too: recipes write "salt and pepper" as a single
+    ingredient line, which parses to one name that matches no staple and lands
+    on the shopping list 355 times over a handful of realistic pantries.
+    """
+    if name in PANTRY_STAPLES:
+        return True
+    parts = [part.strip() for part in name.split(" and ")]
+    return len(parts) > 1 and all(part in PANTRY_STAPLES for part in parts)
 
 
 @dataclass(frozen=True)
@@ -44,6 +57,8 @@ class RecipeMatch:
         missing: Non-staple ingredients the pantry lacks, sorted.
         staples_assumed: Staples the recipe needs that the pantry did not list,
             excluded from the score but surfaced for the composer.
+        pantry_size: How many ingredients the user had. Needed to tell "uses
+            four of your five" from "uses four of your twenty".
     """
 
     recipe: Recipe
@@ -51,6 +66,7 @@ class RecipeMatch:
     matched: tuple[str, ...] = field(default=())
     missing: tuple[str, ...] = field(default=())
     staples_assumed: tuple[str, ...] = field(default=())
+    pantry_size: int = 0
 
     @property
     def is_complete(self) -> bool:
@@ -82,7 +98,11 @@ def score_overlap(
         ingredients covered. A recipe made entirely of staples scores ``1.0``.
     """
     required = recipe.ingredient_names
-    staples = (required & PANTRY_STAPLES) - pantry if assume_staples else set()
+    staples = (
+        {name for name in required if is_staple(name)} - pantry
+        if assume_staples
+        else set()
+    )
     countable = required - staples
 
     matched = countable & pantry
@@ -95,13 +115,23 @@ def score_overlap(
         matched=tuple(sorted(matched)),
         missing=tuple(sorted(missing)),
         staples_assumed=tuple(sorted(staples)),
+        pantry_size=len(pantry),
     )
 
 
-#: What one ingredient you would have to buy costs, measured against one you
-#: already have. Above 1.0 because the question is "what can I cook *now*":
-#: a trip to the shop is worth more than one extra ingredient used.
-MISSING_PENALTY = 1.5
+#: What one ingredient you would have to buy costs. Modest, because
+#: ``max_missing`` is already a hard budget the user set: within a budget they
+#: have agreed to, shopping should shade the ranking rather than dominate it.
+#: At 1.5 it dominated, and a recipe using one pantry item and needing nothing
+#: outranked one using four and needing two.
+MISSING_PENALTY = 0.7
+
+#: Reward for using a large *fraction* of what the user has. Counting matches
+#: alone treats "uses four of your five" and "uses four of your twenty" as the
+#: same answer, and treats a recipe that touches one lonely ingredient as a
+#: reasonable reply to a full fridge. It is not: the question was what to cook
+#: with *these*.
+UTILISATION_WEIGHT = 3.0
 
 #: A gentle preference for shorter recipes, per ingredient and per step. Small
 #: on purpose -- it should break ties between comparable recipes, not push a
@@ -120,6 +150,7 @@ def cookability(
     missing_penalty: float = MISSING_PENALTY,
     complexity_penalty: float = COMPLEXITY_PENALTY,
     unlisted_penalty: float = UNLISTED_PENALTY,
+    utilisation_weight: float = UTILISATION_WEIGHT,
 ) -> float:
     """How well a recipe answers "what can I cook with what I have?".
 
@@ -138,8 +169,12 @@ def cookability(
     alone, because "you have 4 of these 6" is still the honest thing to show.
     """
     recipe = match.recipe
+    utilisation = (
+        len(match.matched) / match.pantry_size if match.pantry_size else 0.0
+    )
     return (
         len(match.matched)
+        + utilisation_weight * utilisation
         - missing_penalty * len(match.missing)
         - complexity_penalty * (len(recipe.ingredients) + len(recipe.steps))
         - unlisted_penalty * len(recipe.unlisted_in_steps)

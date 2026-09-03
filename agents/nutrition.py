@@ -124,6 +124,7 @@ PAIR_WEIGHT_G: dict[tuple[str, str], float] = {
 UNIT_WEIGHT_G: dict[str, float] = {
     "clove": 3.0, "slice": 25.0, "piece": 50.0, "pinch": 0.36, "dash": 0.6,
     "knob": 15.0, "splash": 15.0, "drizzle": 10.0,
+    "sprinkle": 1.0, "scoop": 60.0, "squeeze": 5.0,
     "sprig": 2.0, "handful": 30.0, "bunch": 25.0, "stalk": 40.0,
     "head": 500.0, "stick": 113.0, "fillet": 150.0, "can": 400.0,
     "jar": 340.0, "packet": 200.0, "bottle": 500.0, "box": 400.0,

@@ -144,13 +144,19 @@ No embedding distance reaches the user-visible ranking. "You have 4 of these 6
 ingredients" is a claim the critic can verify and the UI can explain; a cosine
 distance is neither.
 
-The score answers *"what can I cook with what I have?"* rather than *"what do I
-mostly own?"* — those turn out to be different questions. Ranking by coverage
-alone rates a flatbread of flour, water and oil a perfect match, while rating a
-supper you could make by buying one onion at 60%. So instead: every ingredient
-you already have earns a point, every one you would have to buy costs 1.5, and
-long or internally inconsistent recipes are nudged down. A `max_missing` cap
-("willing to buy" in the UI) hides anything beyond your patience.
+The score answers *"what can I cook with **these**?"* Three things go into it:
+
+- **How many of your ingredients it uses.** One point each.
+- **What share of your pantry it uses.** Counting matches alone treats "uses
+  four of your five" and "uses four of your twenty" as the same answer. It
+  isn't: a `rice, egg, soy sauce, spring onion, carrot` pantry should return
+  fried rice, not a pound cake that happens to use the egg.
+- **How much shopping it needs.** A modest 0.7 per ingredient, because
+  `max_missing` ("willing to buy" in the UI) is already a hard budget you set.
+  Within a budget you agreed to, shopping should shade the ranking, not
+  dominate it.
+
+Long or internally inconsistent recipes are nudged down after that.
 
 Substitutions follow the same logic: a replacement is only offered if you
 already have it. Being told to buy flaxseed instead of an egg is not help.

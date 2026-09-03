@@ -57,6 +57,7 @@ UNIT_ALIASES: dict[str, str] = {
     "sprig": "sprig", "sprigs": "sprig",
     "handful": "handful", "handfuls": "handful",
     "knob": "knob", "knobs": "knob", "splash": "splash", "drizzle": "drizzle",
+    "sprinkle": "sprinkle", "scoop": "scoop", "squeeze": "squeeze",
     "stick": "stick", "sticks": "stick",
     "fillet": "fillet", "fillets": "fillet",
     "package": "packet", "pkg": "packet", "box": "box", "boxes": "box",

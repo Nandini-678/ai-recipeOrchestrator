@@ -108,9 +108,11 @@ class TestRankingWithoutIndex:
         assert results[0].recipe.title == "Chicken Fried Rice"
         assert results[0].score == 1.0
 
-    def test_results_are_sorted_by_score_descending(self, sample_recipes):
+    def test_results_are_sorted_by_cookability_descending(self, sample_recipes):
+        """Ranking is by cookability, not by the raw coverage it reports."""
         agent = RetrievalAgent(sample_recipes)
-        scores = [m.score for m in agent.retrieve(["egg", "tomato", "garlic"], top_n=6)]
+        ranked = agent.retrieve(["egg", "tomato", "garlic"], top_n=6)
+        scores = [cookability(m) for m in ranked]
         assert scores == sorted(scores, reverse=True)
 
     def test_top_n_is_respected(self, sample_recipes):
@@ -223,7 +225,10 @@ class TestRetrievalWithIndex:
         assert agent.retrieve(["egg"], top_n=2)[0].recipe.id == "3"
 
 
-def _match(title, have, need, *, ingredients=None, steps=1, unlisted=()):
+def _match(
+    title, have, need, *, ingredients=None, steps=1, unlisted=(),
+    pantry_size=None,
+):
     """Build a match with the shape the ranking cares about."""
     names = list(have) + list(need)
     recipe = Recipe(
@@ -234,7 +239,11 @@ def _match(title, have, need, *, ingredients=None, steps=1, unlisted=()):
         unlisted_in_steps=list(unlisted),
     )
     return RecipeMatch(
-        recipe=recipe, score=0.0, matched=tuple(have), missing=tuple(need)
+        recipe=recipe,
+        score=0.0,
+        matched=tuple(have),
+        missing=tuple(need),
+        pantry_size=pantry_size if pantry_size is not None else len(have),
     )
 
 
@@ -246,11 +255,22 @@ class TestCookability:
         few = _match("few", ["a"], [])
         assert cookability(many) > cookability(few)
 
-    def test_needing_a_shop_costs_more_than_an_extra_match_gains(self):
-        """One trip to the shop outweighs one more ingredient used."""
-        cook_now = _match("now", ["a", "b"], [])
-        buy_one = _match("buy", ["a", "b", "c"], ["d"])
+    def test_shopping_costs_something(self):
+        """Same ingredients used, but one needs a trip; it should rank lower."""
+        cook_now = _match("now", ["a", "b"], [], pantry_size=2)
+        buy_one = _match("buy", ["a", "b"], ["d"], pantry_size=2)
         assert cookability(cook_now) > cookability(buy_one)
+
+    def test_but_shopping_does_not_outweigh_using_the_pantry(self):
+        """The complaint this weighting fixes.
+
+        A recipe touching one lonely ingredient and needing nothing used to
+        outrank one using four of the five things the user actually had, which
+        is not an answer to "what can I cook with these".
+        """
+        barely = _match("barely", ["a"], [], pantry_size=5)
+        properly = _match("properly", ["a", "b", "c", "d"], ["z", "y"], pantry_size=5)
+        assert cookability(properly) > cookability(barely)
 
     def test_a_trivially_covered_recipe_loses_to_a_real_match(self):
         """The flatbread problem.
@@ -304,3 +324,57 @@ class TestMaxMissing:
     ):
         agent = RetrievalAgent(sample_recipes)
         assert agent.retrieve(["chocolate"], top_n=6, max_missing=0) == []
+
+
+class TestPantryUtilisation:
+    """Utilisation is part of the answer.
+
+    "Uses four of your five" differs from "uses four of your twenty", and
+    the ranking has to tell them apart.
+    """
+
+    def test_using_a_larger_share_of_the_pantry_wins(self):
+        focused = _match("focused", ["a", "b"], [], pantry_size=2)
+        incidental = _match("incidental", ["a", "b"], [], pantry_size=10)
+        assert cookability(focused) > cookability(incidental)
+
+    def test_pantry_size_is_recorded_on_the_match(self, sample_recipes):
+        match = score_overlap({"egg", "butter", "salt"}, sample_recipes[2])
+        assert match.pantry_size == 3
+
+    def test_a_fried_rice_pantry_gets_a_fried_rice(self, sample_recipes):
+        """The reported symptom, in miniature.
+
+        A pantry pointing clearly at one recipe should not return the one that
+        happens to touch a single item.
+        """
+        agent = RetrievalAgent(sample_recipes)
+        best = agent.retrieve(
+            ["chicken breast", "rice", "egg", "green onion", "soy sauce"], top_n=1
+        )[0]
+        assert best.recipe.title == "Chicken Fried Rice"
+        assert len(best.matched) >= 4
+
+
+class TestCompoundStaples:
+    def test_salt_and_pepper_is_not_a_shopping_item(self):
+        """Recipes write it as one ingredient line; it is two staples."""
+        from agents.retrieval import is_staple
+
+        assert is_staple("salt and pepper")
+
+    def test_a_real_ingredient_is_not_excused_by_a_staple_partner(self):
+        from agents.retrieval import is_staple
+
+        assert not is_staple("salt and saffron")
+        assert not is_staple("chicken")
+
+    def test_it_keeps_a_compound_staple_off_the_missing_list(self):
+        recipe = Recipe(
+            id="x",
+            title="T",
+            ingredients=[{"name": "rice"}, {"name": "salt and pepper"}],
+        )
+        match = score_overlap({"rice"}, recipe)
+        assert match.missing == ()
+        assert "salt and pepper" in match.staples_assumed
